@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{fragments :: head(#{demand.title})}"></head>
+<body>
+<header th:replace="~{fragments :: header('demand')}"></header>
+<main>
+    <h1 th:text="#{demand.heading}">Item gialli richiesti</h1>
+    <p class="muted" th:utext="#{demand.intro(${analysedCombos})}"></p>
+
+    <div class="notice" th:if="${items.isEmpty()}">
+        <span th:text="#{demand.empty.before}"></span> <a th:href="@{/builds}" th:text="#{nav.builds}">Build</a>
+        <span th:text="#{demand.empty.after}"></span>
+    </div>
+
+    <section class="card" th:if="${!items.isEmpty()}">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr><th>Slot</th><th>Base</th><th th:text="#{demand.col.mods}">Mod principali</th><th class="right" th:text="#{common.estPlayers}">Giocatori stimati</th>
+                    <th class="right">Trend</th><th th:text="#{demand.col.usedBy}">Usato da</th><th></th></tr>
+                </thead>
+                <tbody>
+                <tr th:each="d : ${items}">
+                    <td th:text="${@fmt.slot(d.slot)}"></td>
+                    <td class="nowrap"><span class="rare-name" th:text="${d.baseType}"></span><a th:replace="~{fragments :: wiki(${d.baseType})}"></a></td>
+                    <td class="small" th:with="link=${tradeUrls.get(d.key())}">
+                        <div th:each="m : ${d.mods}">
+                            <span th:text="${m}"></span>
+                            <span class="pill warn" th:if="${link != null and link.missingMods.contains(m)}"
+                                  th:title="#{common.notSearchable.title}" th:text="#{common.notSearchable}">non cercabile</span>
+                        </div>
+                    </td>
+                    <td class="right" th:text="${@fmt.num(T(java.lang.Math).round(d.players))}"></td>
+                    <td class="right"><span th:replace="~{fragments :: change(${d.trendPct})}"></span></td>
+                    <td class="small">
+                        <div th:each="u, st : ${d.usages}" th:if="${st.index < 3}">
+                            <a th:href="@{/builds/view(ascendancy=${u.ascendancy},skill=${u.skill})}" th:text="${u.skill + ' · ' + u.ascendancy}"></a>
+                            <span class="muted" th:text="'(' + ${u.archetype} + ')'"></span>
+                        </div>
+                        <div class="muted" th:if="${d.usages.size() > 3}" th:text="#{demand.more(${d.usages.size() - 3})}"></div>
+                    </td>
+                    <td>
+                        <a class="btn secondary small nowrap" th:if="${tradeUrls.get(d.key()) != null}" th:href="${tradeUrls.get(d.key()).url}"
+                           th:title="#{demand.similar.title(${d.baseType}, ${tradeUrls.get(d.key()).searchedMods.size()})}"
+                           target="_blank" rel="noopener" th:text="#{demand.similar}">Item simili</a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="small muted" th:utext="#{demand.note}"></p>
+    </section>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,84 @@
+server:
+  # Porta del sito: http://localhost:8080 (si può cambiare con la variabile d'ambiente PORT)
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: poe-meta-advisor
+  datasource:
+    # Database su file nella cartella ./data (creata automaticamente, esclusa da git)
+    url: jdbc:h2:file:./data/poemeta;AUTO_SERVER=TRUE
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  thymeleaf:
+    cache: false
+  messages:
+    # Testi dell'interfaccia: messages.properties (italiano) e messages_en.properties (inglese)
+    basename: messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
+
+logging:
+  level:
+    it.poemeta: INFO
+
+poemeta:
+  # User-Agent inviato a poe.ninja e a pathofexile.com. Se vuoi, aggiungi un tuo contatto.
+  user-agent: "poe-meta-advisor/0.1 (progetto amatoriale, uso locale)"
+  # Pausa minima tra due richieste HTTP verso poe.ninja (millisecondi). Non scendere sotto 500.
+  request-delay-ms: 1000
+
+  # Lega di default: "auto" sceglie la challenge league più recente, altrimenti scrivi il nome (es. "Standard").
+  default-league: auto
+
+  builds:
+    # Personaggi scaricati per ogni coppia skill + ascendancy
+    sample-size: 200
+    # Personaggi aggiunti dal pulsante "Estendi analisi"
+    extend-size: 200
+    # Una coppia skill + ascendancy viene mostrata solo se ha almeno questi personaggi nella lega
+    min-characters: 30
+    # Pausa tra due download di personaggi (millisecondi). poe.ninja/Cloudflare blocca l'IP per
+    # un'ora se si scaricano troppi personaggi di fila (~60 in 1-2 minuti): non abbassarla troppo.
+    # Con 5000 ms, 200 personaggi richiedono circa 17 minuti.
+    character-delay-ms: 5000
+    # Ogni quante ore ricalcolare l'elenco delle coppie skill + ascendancy
+    combos-refresh-hours: 6
+    # Ogni quante ore aggiornare in automatico le coppie preferite
+    favorites-refresh-hours: 6
+    # Un personaggio scaricato viene riutilizzato per queste ore prima di riscaricarlo
+    character-cache-hours: 24
+
+  archetypes:
+    # Somiglianza minima (0-1) per mettere due personaggi nello stesso archetipo
+    similarity-threshold: 0.55
+    # Pesi della somiglianza (vengono normalizzati, non serve che sommino a 1)
+    weight-gems: 0.35
+    weight-tree: 0.35
+    weight-items: 0.30
+    # Un elemento è "core" se presente in almeno questa quota dei personaggi dell'archetipo
+    core-threshold: 0.70
+    # Sotto questa quota un elemento non viene mostrato nemmeno come "flessibile"
+    flex-threshold: 0.25
+    # Un archetipo sotto questa quota della coppia è segnalato come "variante minore"
+    minor-share: 0.05
+
+  economy:
+    # Ogni quanti minuti aggiornare i prezzi da poe.ninja
+    refresh-minutes: 30
+    # Ogni quanti minuti salvare uno snapshot dei prezzi per lo storico
+    history-every-minutes: 60
+    # Giorni di storico da conservare
+    history-days: 60
+    # Filtri anti-rumore per le classifiche "in crescita / in calo"
+    min-listings: 10
+    min-chaos-currency: 0.5
+    min-chaos-unique: 10

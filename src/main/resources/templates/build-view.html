@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{fragments :: head(${skill + ' ' + ascendancy})}"></head>
+<body>
+<header th:replace="~{fragments :: header('builds')}"></header>
+<main>
+    <p class="small"><a th:href="@{/builds}" th:text="#{view.back}">← Tutte le build</a></p>
+    <div class="archetype-head">
+        <h1>
+            <span class="gem-name" th:text="${skill}">Skill</span><a th:replace="~{fragments :: wiki(${skill})}"></a>
+            · <span th:text="${ascendancy}">Ascendancy</span><a th:replace="~{fragments :: wiki(${ascendancy})}"></a>
+        </h1>
+        <div style="display:flex; gap:.5rem; flex-wrap:wrap">
+            <form th:action="@{/builds/favorite}" method="post">
+                <input type="hidden" name="ascendancy" th:value="${ascendancy}">
+                <input type="hidden" name="skill" th:value="${skill}">
+                <input type="hidden" name="back" th:value="${'/builds/view?ascendancy=' + #uris.escapeQueryParam(ascendancy) + '&skill=' + #uris.escapeQueryParam(skill)}">
+                <button class="btn secondary small" type="submit"
+                        th:text="${favorite} ? #{view.favorite} : #{view.addFavorite}">☆</button>
+            </form>
+            <form th:action="@{/builds/run}" method="post" th:if="${running == null}">
+                <input type="hidden" name="ascendancy" th:value="${ascendancy}">
+                <input type="hidden" name="skill" th:value="${skill}">
+                <button class="btn small" type="submit" th:text="${analysis == null} ? #{view.analyze} : #{view.reanalyze}">Analizza</button>
+            </form>
+            <form th:action="@{/builds/run}" method="post" th:if="${running == null and analysis != null}">
+                <input type="hidden" name="ascendancy" th:value="${ascendancy}">
+                <input type="hidden" name="skill" th:value="${skill}">
+                <input type="hidden" name="extend" value="true">
+                <button class="btn secondary small" type="submit"
+                        th:title="#{view.extend.title(${extendSize})}"
+                        th:text="#{view.extend(${extendSize})}">Estendi</button>
+            </form>
+        </div>
+    </div>
+
+    <section class="card" th:if="${running != null}" th:attr="data-analysis-progress=${ascendancy + '|' + skill}" style="margin:.8rem 0">
+        <div class="small"><strong th:text="#{common.analysesRunning}">Analisi in corso</strong> —
+            <span class="muted" data-progress-label th:text="${@fmt.status(running.message)}">In coda</span></div>
+        <div class="progress" style="margin-top:.4rem"><span th:style="'width:' + ${running.progressPercent} + '%'"></span></div>
+        <p class="small muted" style="margin:.4rem 0 0" th:text="#{view.reloadWhenDone}"></p>
+    </section>
+
+    <div class="notice error" th:if="${analysis == null and running == null}" th:utext="#{view.notAnalysed}"></div>
+
+    <th:block th:if="${result != null}">
+        <div class="stats-row">
+            <span><strong th:text="${@fmt.num(result.comboTotal)}">0</strong> <span th:text="#{view.leagueChars}">personaggi nella lega</span></span>
+            <span th:if="${trend != null}"><span th:text="#{view.vsPrevious}"></span>
+                <span th:replace="~{fragments :: change(${trend})}"></span></span>
+            <span><strong th:text="${result.sampleSize}">0</strong> <span th:text="#{view.analysed}">analizzati</span></span>
+            <span th:if="${result.failed > 0}" th:text="#{view.failed(${result.failed})}"></span>
+            <span><span th:text="#{view.updated}">aggiornata</span> <strong th:text="${@fmt.ago(result.analyzedAt)}">ora</strong></span>
+        </div>
+
+        <section class="card" th:if="${overall != null}" style="margin-bottom:1rem">
+            <h3 th:text="#{view.overall(${@fmt.num(result.comboTotal)})}"></h3>
+            <p class="small muted" style="margin-top:0" th:text="#{view.overall.note}"></p>
+            <div class="grid two">
+                <div>
+                    <div class="section-title">Unique</div>
+                    <table>
+                        <tbody>
+                        <tr th:each="u : ${overallUniques}">
+                            <td>
+                                <span class="item-name">
+                                    <img class="icon" th:if="${u.icon != null}" th:src="${u.icon}" alt="" loading="lazy">
+                                    <span class="unique-name" th:text="${u.name}">Unique</span>
+                                </span>
+                                <a th:replace="~{fragments :: wiki(${u.name})}"></a>
+                            </td>
+                            <td><span class="pill" th:classappend="${u.core} ? 'core'" th:text="${@fmt.pct(u.pct)}">0%</span></td>
+                            <td class="right nowrap" th:text="${@fmt.price(u.chaos, divinePrice)}">–</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <div class="section-title" th:text="#{view.gems}">Gemme</div>
+                    <div class="chips">
+                        <span th:each="s : ${overall.gems}" class="pill" th:classappend="${s.pct >= coreThreshold} ? 'core'">
+                            <span th:text="${@fmt.support(s.name)}"></span> <span class="muted" th:text="${@fmt.pct(s.pct)}"></span>
+                        </span>
+                    </div>
+                    <th:block th:if="${!overall.keystones.isEmpty()}">
+                        <div class="section-title" th:text="#{view.keystonesPassives}">Keystone e passive chiave</div>
+                        <div class="chips">
+                            <span th:each="s : ${overall.keystones}" class="pill" th:classappend="${s.pct >= coreThreshold} ? 'core'">
+                                <span th:text="${s.name}"></span> <span class="muted" th:text="${@fmt.pct(s.pct)}"></span>
+                            </span>
+                        </div>
+                    </th:block>
+                    <th:block th:if="${!overall.anoints.isEmpty()}">
+                        <div class="section-title">Anoint</div>
+                        <div class="chips">
+                            <span th:each="s : ${overall.anoints}" class="pill">
+                                <span th:text="${s.name}"></span> <span class="muted" th:text="${@fmt.pct(s.pct)}"></span>
+                            </span>
+                        </div>
+                    </th:block>
+                    <th:block th:if="${!overall.bloodlines.isEmpty()}">
+                        <div class="section-title">Bloodline</div>
+                        <div class="chips">
+                            <span th:each="s : ${overall.bloodlines}" class="pill">
+                                <span th:text="${s.name}"></span> <span class="muted" th:text="${@fmt.pct(s.pct)}"></span>
+                            </span>
+                        </div>
+                    </th:block>
+                    <th:block th:if="${!overall.rareSlots.isEmpty()}">
+                        <div class="section-title" th:text="#{view.rareSlots}">Slot con item giallo</div>
+                        <div class="chips">
+                            <span th:each="s : ${overall.rareSlots}" class="pill">
+                                <span class="rare-name" th:text="${s.name}"></span> <span class="muted" th:text="${@fmt.pct(s.pct)}"></span>
+                            </span>
+                        </div>
+                    </th:block>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <h3 th:text="#{view.archetypes}">Archetipi</h3>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr><th>#</th><th th:text="#{view.col.archetype}">Archetipo</th><th th:text="#{view.col.share}">Quota</th><th class="right" th:text="#{common.estPlayers}">Giocatori stimati</th>
+                        <th class="right" th:text="#{view.col.cohesion}">Somiglianza interna</th><th class="right" th:text="#{view.col.cost}">Costo stimato</th></tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="v : ${views}">
+                        <td th:text="${v.a.index}">1</td>
+                        <td>
+                            <a th:href="'#arch-' + ${v.a.index}" th:text="${@fmt.archetype(v.a.label)}">Label</a>
+                            <span class="pill warn" th:if="${v.a.minor}" th:text="#{view.minor}">variante minore</span>
+                        </td>
+                        <td style="min-width:140px">
+                            <div class="bar"><span th:style="'width:' + ${v.a.share * 100} + '%'"></span></div>
+                            <span class="small" th:text="${@fmt.pct(v.a.share)} + ' (' + ${v.a.size} + ')'">0%</span>
+                        </td>
+                        <td class="right" th:text="${@fmt.num(T(java.lang.Math).round(result.comboTotal * v.a.share))}">0</td>
+                        <td class="right" th:text="${@fmt.pct(v.a.cohesion)}">0%</td>
+                        <td class="right nowrap" th:text="${@fmt.price(v.costChaos, divinePrice)}">–</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="small muted" style="margin-bottom:0" th:utext="#{view.legend(${@fmt.pct(coreThreshold)})}"></p>
+        </section>
+
+        <section class="card archetype" th:each="v : ${views}" th:id="'arch-' + ${v.a.index}">
+            <div class="archetype-head">
+                <h2>
+                    <span class="muted" th:text="'#' + ${v.a.index}">#1</span>
+                    <span th:text="${@fmt.archetype(v.a.label)}">Label</span>
+                    <span class="pill warn" th:if="${v.a.minor}" th:text="#{view.minor.long}">variante minore: dati poco affidabili</span>
+                </h2>
+                <span class="pill core" th:text="#{view.ofPair(${@fmt.pct(v.a.share)})}">0%</span>
+            </div>
+            <div class="stats-row">
+                <span><strong th:text="${v.a.size}">0</strong> <span th:text="#{view.characters}">personaggi</span></span>
+                <span><span th:text="#{view.avgLevel}">livello medio</span> <strong th:text="${@fmt.decimal(v.a.avgLevel)}">0</strong></span>
+                <span><span th:text="#{view.avgLife}">vita media</span> <strong th:text="${@fmt.num(T(java.lang.Math).round(v.a.avgLife))}">0</strong></span>
+                <span><span th:text="#{view.avgEs}">ES medio</span> <strong th:text="${@fmt.num(T(java.lang.Math).round(v.a.avgEnergyShield))}">0</strong></span>
+                <span><span th:text="#{view.cost}">costo stimato</span> <strong th:text="${@fmt.price(v.costChaos, divinePrice)}">–</strong>
+                    <span th:if="${v.unpricedUniques > 0}" class="small"
+                          th:text="#{view.unpriced(${v.unpricedUniques})}"></span></span>
+            </div>
+
+            <div class="grid two">
+                <div>
+                    <div class="section-title" th:text="#{view.representative}">Build rappresentativa</div>
+                    <div th:if="${v.a.representative != null}">
+                        <a th:href="${v.profileUrl}" target="_blank" rel="noopener"
+                           th:text="${v.a.representative.name}">Nome</a>
+                        <span class="muted small" th:text="#{view.representative.stats(${v.a.representative.level}, ${@fmt.num(v.a.representative.life)}, ${@fmt.num(v.a.representative.energyShield)}, ${@fmt.pct(v.a.representative.avgSimilarity)})}"></span>
+                        <details th:if="${v.a.representative.pobCode != null}" style="margin-top:.4rem">
+                            <summary th:text="#{view.pob}">Codice Path of Building</summary>
+                            <textarea class="copy" readonly th:id="'pob-' + ${v.a.index}" th:text="${v.a.representative.pobCode}"></textarea>
+                            <button class="btn secondary small" type="button" th:attr="data-copy='pob-' + ${v.a.index}" th:text="#{view.copyPob}">Copia codice PoB</button>
+                        </details>
+                    </div>
+
+                    <div class="section-title" th:text="#{view.supports}">Gemme di supporto della skill</div>
+                    <div class="chips">
+                        <span th:each="s : ${v.supports}" class="pill" th:classappend="${s.core} ? 'core'">
+                            <span th:text="${@fmt.support(s.name)}">Support</span>
+                            <span class="muted" th:text="${@fmt.pct(s.pct)}">0%</span>
+                        </span>
+                        <span th:if="${v.supports.isEmpty()}" class="muted small" th:text="#{view.noData}">nessun dato</span>
+                    </div>
+
+                    <th:block th:if="${!v.bloodlines.isEmpty()}">
+                        <div class="section-title">Bloodline</div>
+                        <div class="chips">
+                            <span th:each="s : ${v.bloodlines}" class="pill" th:classappend="${s.core} ? 'core'"
+                                  th:text="${s.name} + ' ' + ${@fmt.pct(s.pct)}"></span>
+                        </div>
+                    </th:block>
+
+                    <th:block th:if="${!v.keystones.isEmpty()}">
+                        <div class="section-title">Keystone</div>
+                        <div class="chips">
+                            <span th:each="s : ${v.keystones}" class="pill" th:classappend="${s.core} ? 'core'">
+                                <span th:text="${s.name}"></span> <span class="muted" th:text="${@fmt.pct(s.pct)}"></span>
+                            </span>
+                        </div>
+                    </th:block>
+
+                    <th:block th:if="${!v.masteries.isEmpty()}">
+                        <div class="section-title" th:text="#{view.masteries}">Mastery più usate</div>
+                        <div class="chips">
+                            <span th:each="s : ${v.masteries}" class="pill" th:classappend="${s.core} ? 'core'">
+                                <span th:text="${s.name}"></span> <span class="muted" th:text="${@fmt.pct(s.pct)}"></span>
+                            </span>
+                        </div>
+                    </th:block>
+
+                    <div class="section-title" th:text="#{view.copyList.title}">Lista da copiare</div>
+                    <textarea class="copy" readonly th:id="'list-' + ${v.a.index}" th:text="${v.itemList}"></textarea>
+                    <button class="btn secondary small" type="button" th:attr="data-copy='list-' + ${v.a.index}" th:text="#{view.copyList}">Copia lista</button>
+                </div>
+
+                <div>
+                    <div class="section-title">Unique</div>
+                    <table>
+                        <tbody>
+                        <tr th:each="u : ${v.uniques}">
+                            <td>
+                                <span class="item-name">
+                                    <img class="icon" th:if="${u.icon != null}" th:src="${u.icon}" alt="" loading="lazy">
+                                    <span class="unique-name" th:text="${u.name}">Unique</span>
+                                </span>
+                                <a th:replace="~{fragments :: wiki(${u.name})}"></a>
+                            </td>
+                            <td><span class="pill" th:classappend="${u.core} ? 'core'" th:text="${@fmt.pct(u.pct)}">0%</span></td>
+                            <td class="right nowrap" th:text="${@fmt.price(u.chaos, divinePrice)}">–</td>
+                        </tr>
+                        <tr th:if="${v.uniques.isEmpty()}"><td class="muted small" th:text="#{view.noUniques}"></td></tr>
+                        </tbody>
+                    </table>
+
+                    <th:block th:if="${!v.gemsToBuy.isEmpty()}">
+                        <div class="section-title" th:text="#{view.gemsToBuy}">Gemme da comprare (≥ 5 c)</div>
+                        <table>
+                            <tbody>
+                            <tr th:each="g : ${v.gemsToBuy}">
+                                <td>
+                                    <span class="item-name">
+                                        <img class="icon" th:if="${g.icon != null}" th:src="${g.icon}" alt="" loading="lazy">
+                                        <span class="gem-name" th:text="${g.name}">Gem</span>
+                                    </span>
+                                    <a th:replace="~{fragments :: wiki(${g.name})}"></a>
+                                </td>
+                                <td><span class="pill" th:classappend="${g.core} ? 'core'" th:text="${@fmt.pct(g.pct)}">0%</span></td>
+                                <td class="right nowrap" th:text="${@fmt.price(g.chaos, divinePrice)}">–</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </th:block>
+                </div>
+            </div>
+
+            <div class="section-title" th:text="#{view.rares}">Item gialli più usati</div>
+            <div class="grid three">
+                <div class="rare-slot" th:each="r : ${v.rareSlots}">
+                    <h4>
+                        <span th:text="${@fmt.slot(r.slot)}">Slot</span>
+                        <span class="muted small" th:text="#{view.rareIn(${@fmt.pct(r.pct > 1 ? 1.0 : r.pct)})}">0%</span>
+                    </h4>
+                    <div class="small">
+                        <span th:each="b, st : ${r.bases}" th:if="${st.index < 3}">
+                            <span class="rare-name" th:text="${b.name}">Base</span>
+                            <a th:replace="~{fragments :: wiki(${b.name})}"></a>
+                            <span class="muted" th:text="${@fmt.pct(b.pct)}">0%</span><br>
+                        </span>
+                    </div>
+                    <ul>
+                        <li th:each="m : ${r.mods}">
+                            <strong th:if="${r.inProfile(m.text)}" th:text="${m.text}">mod</strong>
+                            <span th:unless="${r.inProfile(m.text)}" class="muted" th:text="${m.text}">mod</span>
+                            <span class="muted" th:text="'· ' + ${@fmt.pct(m.pct)}">0%</span>
+                            <span class="muted small" th:if="${m.avgValue != null}" th:text="#{view.avg(${@fmt.decimal(m.avgValue)})}"></span>
+                            <span class="pill warn" th:if="${r.trade != null and r.trade.missingMods.contains(m.text)}"
+                                  th:title="#{common.notSearchable.title}" th:text="#{common.notSearchable}">non cercabile</span>
+                        </li>
+                    </ul>
+                    <p style="margin:.5rem 0 0" th:if="${r.trade != null}">
+                        <a class="btn secondary small" th:href="${r.trade.url}" target="_blank" rel="noopener"
+                           th:text="${r.profileMods.isEmpty()} ? #{view.tradeBase} : #{view.tradeSimilar(${r.trade.searchedMods.size()})}">Vedi item simili</a>
+                    </p>
+                </div>
+                <p th:if="${v.rareSlots.isEmpty()}" class="muted small" th:text="#{view.noRares}"></p>
+            </div>
+        </section>
+    </th:block>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

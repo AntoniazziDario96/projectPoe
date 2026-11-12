@@ -1,0 +1,27 @@
+# Build
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Database locale (ognuno ha il suo)
+data/
+*.mv.db
+*.trace.db
+
+# Configurazione locale di Claude Code
+.claude/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Log
+*.log

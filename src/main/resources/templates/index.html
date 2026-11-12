@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{fragments :: head(#{home.title})}"></head>
+<body>
+<header th:replace="~{fragments :: header('home')}"></header>
+<main>
+    <h1><span th:text="#{home.title}">Novità</span> · <span th:text="${league.name}">Lega</span></h1>
+
+    <div class="notice" th:if="${!league.hasEconomy()}" th:text="#{home.noEconomy}"></div>
+    <div class="notice" th:if="${league.hasEconomy() and snapshot == null}" data-auto-reload="5000" th:text="#{home.loadingPrices}"></div>
+
+    <section class="card" th:if="${!activeAnalyses.isEmpty()}" style="margin-bottom:1rem">
+        <h3 th:text="#{common.analysesRunning}">Analisi in corso</h3>
+        <div th:each="a : ${activeAnalyses}" th:attr="data-analysis-progress=${a.ascendancy + '|' + a.skill}" style="margin:.5rem 0">
+            <div class="small">
+                <a th:href="@{/builds/view(ascendancy=${a.ascendancy},skill=${a.skill})}" th:text="${a.skill + ' · ' + a.ascendancy}"></a>
+                — <span class="muted" data-progress-label th:text="${@fmt.status(a.message)}"></span>
+            </div>
+            <div class="progress"><span th:style="'width:' + ${a.progressPercent} + '%'"></span></div>
+        </div>
+    </section>
+
+    <div class="grid two">
+        <section class="card" th:if="${snapshot != null}">
+            <h3><span th:text="#{home.currencyUp}">Currency in crescita</span> <span class="muted small" th:text="|(#{common.24h})|">(24 ore)</span></h3>
+            <table>
+                <tbody>
+                <tr th:each="l : ${currencyUp}">
+                    <td>
+                        <span class="item-name"><img class="icon" th:if="${l.icon != null}" th:src="${l.icon}" alt="" loading="lazy">
+                            <span th:text="${l.name}"></span></span>
+                        <a th:replace="~{fragments :: wiki(${l.name})}"></a>
+                    </td>
+                    <td class="right nowrap" th:text="${@fmt.price(l.chaos, divinePrice)}"></td>
+                    <td class="right"><span th:replace="~{fragments :: change(${l.change24h})}"></span></td>
+                </tr>
+                <tr th:if="${currencyUp.isEmpty()}"><td class="muted small" th:text="#{home.noRise}"></td></tr>
+                </tbody>
+            </table>
+            <p class="small" style="margin-bottom:0"><a th:href="@{/currency}" th:text="#{home.allCurrency}">Tutta la currency →</a></p>
+        </section>
+
+        <section class="card" th:if="${snapshot != null}">
+            <h3><span th:text="#{home.currencyDown}">Currency in calo</span> <span class="muted small" th:text="|(#{common.24h})|">(24 ore)</span></h3>
+            <table>
+                <tbody>
+                <tr th:each="l : ${currencyDown}">
+                    <td>
+                        <span class="item-name"><img class="icon" th:if="${l.icon != null}" th:src="${l.icon}" alt="" loading="lazy">
+                            <span th:text="${l.name}"></span></span>
+                        <a th:replace="~{fragments :: wiki(${l.name})}"></a>
+                    </td>
+                    <td class="right nowrap" th:text="${@fmt.price(l.chaos, divinePrice)}"></td>
+                    <td class="right"><span th:replace="~{fragments :: change(${l.change24h})}"></span></td>
+                </tr>
+                <tr th:if="${currencyDown.isEmpty()}"><td class="muted small" th:text="#{home.noFall}"></td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card" th:if="${snapshot != null}">
+            <h3><span th:text="#{home.uniquesUp}">Unique in crescita</span> <span class="muted small" th:text="|(#{common.7d})|">(7 giorni)</span></h3>
+            <table>
+                <tbody>
+                <tr th:each="l : ${uniquesUp}">
+                    <td>
+                        <span class="item-name"><img class="icon" th:if="${l.icon != null}" th:src="${l.icon}" alt="" loading="lazy">
+                            <span class="unique-name" th:text="${l.name}"></span></span>
+                        <a th:replace="~{fragments :: wiki(${l.name})}"></a>
+                    </td>
+                    <td class="right nowrap" th:text="${@fmt.price(l.chaos, divinePrice)}"></td>
+                    <td class="right"><span th:replace="~{fragments :: change(${l.change7d})}"></span></td>
+                </tr>
+                </tbody>
+            </table>
+            <p class="small" style="margin-bottom:0"><a th:href="@{/uniques}" th:text="#{home.allUniques}">Tutti gli unique →</a></p>
+        </section>
+
+        <section class="card">
+            <h3 th:text="#{home.favorites}">Build preferite</h3>
+            <table th:if="${!favorites.isEmpty()}">
+                <tbody>
+                <tr th:each="f : ${favorites}">
+                    <td><a th:href="${f.url}" th:text="${f.skill + ' · ' + f.ascendancy}"></a></td>
+                    <td class="small muted" th:text="${f.last != null} ? #{home.updated(${@fmt.ago(f.last.finishedAt)})} : #{home.notAnalysed}"></td>
+                    <td class="right" th:if="${f.trend != null}"><span th:replace="~{fragments :: change(${f.trend})}"></span></td>
+                </tr>
+                </tbody>
+            </table>
+            <p th:if="${favorites.isEmpty()}" class="muted small">
+                <span th:text="#{home.noFavorites.before}"></span> <a th:href="@{/builds}" th:text="#{nav.builds}">Build</a>
+                <span th:text="#{home.noFavorites.after}"></span>
+            </p>
+        </section>
+
+        <section class="card">
+            <h3 th:text="#{home.demand}">Item gialli più richiesti</h3>
+            <table th:if="${!demand.isEmpty()}">
+                <tbody>
+                <tr th:each="d : ${demand}">
+                    <td>
+                        <span class="muted small" th:text="${@fmt.slot(d.slot)}"></span><br>
+                        <span class="rare-name" th:text="${d.baseType}"></span>
+                    </td>
+                    <td class="small" th:text="${#strings.listJoin(d.mods, ', ')}"></td>
+                    <td class="right small nowrap" th:text="#{home.players(${@fmt.num(T(java.lang.Math).round(d.players))})}"></td>
+                </tr>
+                </tbody>
+            </table>
+            <p th:if="${demand.isEmpty()}" class="muted small" th:text="#{home.noDemand}"></p>
+            <p class="small" style="margin-bottom:0"><a th:href="@{/demand}" th:text="#{home.allDemand}">Tutti gli item richiesti →</a></p>
+        </section>
+    </div>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

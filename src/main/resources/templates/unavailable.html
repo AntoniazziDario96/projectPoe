@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{fragments :: head(#{nav.unavailable})}"></head>
+<body>
+<header th:replace="~{fragments :: header('')}"></header>
+<main>
+    <h1 th:text="#{unavailable.heading}">poe.ninja non risponde</h1>
+    <p><span th:text="#{unavailable.before}"></span>
+        <a th:href="@{/}" th:text="#{unavailable.retry}">riprova</a> <span th:text="#{unavailable.after}"></span></p>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

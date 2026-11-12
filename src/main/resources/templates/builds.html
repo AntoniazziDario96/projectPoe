@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{fragments :: head(#{nav.builds})}"></head>
+<body>
+<header th:replace="~{fragments :: header('builds')}"></header>
+<main>
+    <h1><span th:text="#{builds.heading}">Build della lega</span> <span th:text="${league.name}">Lega</span></h1>
+    <p class="muted" th:utext="#{builds.intro(${sampleSize}, ${minutesPerCombo})}"></p>
+
+    <div class="notice" th:if="${queued != null}" th:text="#{builds.queued(${queued})}"></div>
+
+    <section class="card" th:if="${!activeAnalyses.isEmpty()}">
+        <h3 th:text="#{common.analysesRunning}">Analisi in corso</h3>
+        <div th:each="a : ${activeAnalyses}" th:attr="data-analysis-progress=${a.ascendancy + '|' + a.skill}" style="margin:.5rem 0">
+            <div class="small">
+                <a th:href="@{/builds/view(ascendancy=${a.ascendancy},skill=${a.skill})}"
+                   th:text="${a.skill + ' · ' + a.ascendancy}">Skill · Ascendancy</a>
+                — <span class="muted" data-progress-label th:text="${@fmt.status(a.message)}">In coda</span>
+            </div>
+            <div class="progress"><span th:style="'width:' + ${a.progressPercent} + '%'"></span></div>
+        </div>
+    </section>
+
+    <div th:if="${comboList == null}" class="notice" data-auto-reload="4000">
+        <span th:text="#{builds.loading}"></span>
+        <span th:if="${loading != null}" th:text="#{builds.loading.progress(${loading.done}, ${loading.total})}"></span>
+        <span th:text="#{builds.loading.reload}"></span>
+    </div>
+
+    <div th:if="${comboList != null and comboList.error != null}" class="notice error">
+        <span th:text="#{builds.loadError}"></span> <span th:text="${comboList.error}"></span>
+    </div>
+
+    <th:block th:if="${comboList != null}">
+        <div class="filters">
+            <input type="search" th:placeholder="#{builds.filter.placeholder}" data-filter-text th:attr="aria-label=#{builds.filter.text}">
+            <select data-filter-asc th:attr="aria-label=#{builds.filter.asc}">
+                <option value="" th:text="#{builds.filter.allAsc}">Tutte le ascendancy</option>
+                <option th:each="a : ${ascendancies}" th:value="${a}" th:text="${a}"></option>
+            </select>
+            <label class="small"><input type="checkbox" data-filter-done> <span th:text="#{builds.filter.done}">solo già analizzate</span></label>
+            <span class="muted small">
+                <span data-visible-count th:text="${comboList.combos.size()}">0</span> <span th:text="#{builds.pairs}">coppie</span> ·
+                <span th:text="${@fmt.num(comboList.leagueTotal)}">0</span> <span th:text="#{builds.leagueChars}">personaggi nella lega</span> ·
+                <span th:text="#{builds.updated}">aggiornato</span> <span th:text="${@fmt.ago(comboList.loadedAt)}">ora</span>
+            </span>
+            <form th:action="@{/builds/reload}" method="post" style="margin-left:auto">
+                <button class="btn secondary small" type="submit" th:title="#{builds.reload.title}" th:text="#{builds.reload}">Aggiorna elenco</button>
+            </form>
+        </div>
+
+        <form th:action="@{/builds/analyze}" method="post" class="card" style="padding:0">
+            <div class="table-wrap">
+                <table data-combo-table>
+                    <thead>
+                    <tr>
+                        <th></th>
+                        <th>Skill</th>
+                        <th>Ascendancy</th>
+                        <th class="right" th:text="#{builds.col.characters}">Personaggi</th>
+                        <th th:text="#{builds.col.ascShare}">% ascendancy</th>
+                        <th class="right" th:text="#{builds.col.leagueShare}">% lega</th>
+                        <th th:text="#{builds.col.analysis}">Analisi</th>
+                        <th th:title="#{builds.col.fav.title}">★</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="c : ${comboList.combos}"
+                        th:with="key=${c.key()}, d=${done.get(c.key())}"
+                        th:attr="data-search=${#strings.toLowerCase(c.skill + ' ' + c.ascendancy)}, data-asc=${c.ascendancy}, data-done=${d != null}">
+                        <td><input type="checkbox" name="combo" th:value="${key}" th:disabled="${active.contains(key)}"
+                                   th:attr="aria-label=#{builds.select(${c.skill}, ${c.ascendancy})}"></td>
+                        <td><span class="gem-name" th:text="${c.skill}">Skill</span><a th:replace="~{fragments :: wiki(${c.skill})}"></a></td>
+                        <td th:text="${c.ascendancy}">Ascendancy</td>
+                        <td class="right" th:text="${@fmt.num(c.count)}">0</td>
+                        <td>
+                            <div class="bar" th:title="${@fmt.decimal(c.ascendancyShare())} + '%'">
+                                <span th:style="'width:' + ${c.ascendancyShare() > 100 ? 100 : c.ascendancyShare()} + '%'"></span>
+                            </div>
+                        </td>
+                        <td class="right" th:text="${@fmt.decimal(c.leagueShare())} + '%'">0%</td>
+                        <td class="nowrap">
+                            <span th:if="${active.contains(key)}" class="pill core" th:text="#{builds.running}">in corso</span>
+                            <a th:if="${d != null}" th:href="@{/builds/view(ascendancy=${c.ascendancy},skill=${c.skill})}"
+                               th:text="#{builds.view(${@fmt.ago(d.finishedAt)})}">Vedi</a>
+                            <span th:if="${d == null and !active.contains(key)}" class="muted small">–</span>
+                        </td>
+                        <td>
+                            <button class="star-btn" th:classappend="${favs.contains(key)} ? 'on'" type="submit"
+                                    th:formaction="@{/builds/favorite(ascendancy=${c.ascendancy},skill=${c.skill})}"
+                                    formmethod="post" th:title="${favs.contains(key)} ? #{builds.fav.remove} : #{builds.fav.add}"
+                                    th:text="${favs.contains(key)} ? '★' : '☆'">☆</button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="sticky-actions">
+                <span class="muted small"><span data-selected-count>0</span> <span th:text="#{builds.selected}">selezionate</span></span>
+                <button class="btn" type="submit" data-analyze-btn disabled th:text="#{builds.analyze}">Analizza</button>
+            </div>
+        </form>
+    </th:block>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

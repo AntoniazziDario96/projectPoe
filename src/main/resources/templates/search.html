@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{fragments :: head(#{search.title})}"></head>
+<body>
+<header th:replace="~{fragments :: header('search')}"></header>
+<main>
+    <h1 th:text="#{search.title}">Ricerca</h1>
+    <form th:action="@{/search}" method="get" class="filters">
+        <input type="search" name="q" th:value="${q}" th:placeholder="#{search.placeholder}" autofocus style="max-width:420px">
+        <button class="btn" type="submit" th:text="#{search.submit}">Cerca</button>
+    </form>
+
+    <th:block th:if="${!#strings.isEmpty(q)}">
+        <div class="notice" th:if="${!league.hasEconomy()}" th:text="#{search.noEconomy}"></div>
+        <div class="notice" th:if="${league.hasEconomy() and snapshot == null}" data-auto-reload="5000" th:text="#{common.loadingPrices}"></div>
+
+        <p>
+            <a class="btn secondary small" th:href="${@wiki.url(q)}" target="_blank" rel="noopener">
+                <span th:text="#{search.openWiki.before}"></span><span th:text="${q}"></span><span th:text="#{search.openWiki.after}"></span></a>
+            <a class="btn secondary small" th:href="${@wiki.search(q)}" target="_blank" rel="noopener" th:text="#{search.searchWiki}">Cerca sulla wiki</a>
+        </p>
+
+        <section class="card" th:if="${results != null}">
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th th:text="#{common.item}">Oggetto</th><th th:text="#{search.col.type}">Tipo</th><th class="right" th:text="#{common.price}">Prezzo</th><th class="right" th:text="#{common.24h}">24 ore</th><th class="right" th:text="#{common.7d}">7 giorni</th><th th:text="#{common.history30}">Storico 30 gg</th><th></th></tr></thead>
+                    <tbody>
+                    <tr th:each="l : ${results}" th:with="key=${l.links != null ? l.name + ' (' + l.links + 'L)' : l.name}">
+                        <td>
+                            <span class="item-name">
+                                <img class="icon" th:if="${l.icon != null}" th:src="${l.icon}" alt="" loading="lazy">
+                                <span th:classappend="${l.isUnique()} ? 'unique-name' : (${l.isGem()} ? 'gem-name' : '')" th:text="${l.name}"></span>
+                            </span>
+                            <span class="muted small" th:if="${l.variant != null}" th:text="'(' + ${l.variant} + ')'"></span>
+                            <span class="muted small" th:if="${l.links != null}" th:text="#{search.links(${l.links})}"></span>
+                            <span class="pill warn" th:if="${l.lowConfidence}"
+                                  th:title="#{search.lowConfidence.title}" th:text="#{search.lowConfidence}">pochi scambi, prezzo inaffidabile</span>
+                        </td>
+                        <td class="small muted" th:text="${@fmt.category(l.category)}"></td>
+                        <td class="right nowrap" th:text="${@fmt.price(l.chaos, divinePrice)}"></td>
+                        <td class="right"><span th:replace="~{fragments :: change(${l.change24h})}"></span></td>
+                        <td class="right"><span th:replace="~{fragments :: change(${l.change7d})}"></span></td>
+                        <td>
+                            <svg class="spark" viewBox="0 0 100 30" th:if="${!#strings.isEmpty(spark.get(key))}" aria-hidden="true">
+                                <polyline th:attr="points=${spark.get(key)}"></polyline>
+                            </svg>
+                        </td>
+                        <td><a class="btn secondary small" th:href="${@wiki.url(l.name)}" target="_blank" rel="noopener">Wiki</a></td>
+                    </tr>
+                    <tr th:if="${results.isEmpty()}"><td colspan="7" class="muted" th:text="#{search.noResults}"></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </th:block>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' · PoE Meta Advisor'">PoE Meta Advisor</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script>
+        try { document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark'; } catch (e) { document.documentElement.dataset.theme = 'dark'; }
+    </script>
+    <script th:inline="javascript">
+        window.I18N = { copied: /*[[#{common.copied}]]*/ 'Copiato!' };
+    </script>
+    <script th:src="@{/js/app.js}" defer></script>
+</head>
+<body>
+
+<header th:fragment="header(active)" class="topbar">
+    <a class="brand" th:href="@{/}">PoE <span>Meta Advisor</span></a>
+    <nav class="nav">
+        <a th:href="@{/}" th:classappend="${active == 'home'} ? 'active'" th:text="#{nav.home}">Novità</a>
+        <a th:href="@{/builds}" th:classappend="${active == 'builds'} ? 'active'" th:text="#{nav.builds}">Build</a>
+        <a th:href="@{/demand}" th:classappend="${active == 'demand'} ? 'active'" th:text="#{nav.demand}">Item richiesti</a>
+        <a th:href="@{/currency}" th:classappend="${active == 'currency'} ? 'active'" th:text="#{nav.currency}">Currency</a>
+        <a th:href="@{/uniques}" th:classappend="${active == 'uniques'} ? 'active'" th:text="#{nav.uniques}">Unique</a>
+    </nav>
+    <form class="quicksearch" th:action="@{/search}" method="get">
+        <input type="search" name="q" th:placeholder="#{header.search.placeholder}" th:attr="aria-label=#{header.search.placeholder}">
+    </form>
+    <div class="topbar-right">
+        <span class="divine" th:if="${divinePrice != null}" th:title="#{header.divine.title}">
+            1 div = <strong th:text="${@fmt.chaos(divinePrice)}">200 c</strong>
+        </span>
+        <form method="get" class="league-form" th:if="${leagues != null and !leagues.isEmpty()}">
+            <select name="league" th:attr="aria-label=#{header.league}" onchange="this.form.submit()">
+                <option th:each="l : ${leagues}" th:value="${l.url}" th:text="${l.name} + (${l.hasEconomy()} ? '' : #{header.league.noPrices})"
+                        th:selected="${league != null and l.url == league.url}">Lega</option>
+            </select>
+        </form>
+        <a class="lang-toggle" th:with="next=${#locale.language == 'en'} ? 'it' : 'en'"
+           th:href="'?lang=' + ${next}" th:attr="data-lang-toggle=${next},hreflang=${next}"
+           th:title="#{header.lang.title}" th:text="#{header.lang.label}">EN</a>
+        <button type="button" class="theme-toggle" data-theme-toggle th:title="#{header.theme}" th:attr="aria-label=#{header.theme}">◐</button>
+    </div>
+</header>
+
+<footer th:fragment="footer" class="footer" th:utext="#{footer.html}">
+    Dati da poe.ninja. Progetto amatoriale, non affiliato a Grinding Gear Games.
+</footer>
+
+<!-- link alla wiki: icona piccola accanto a un nome -->
+<a th:fragment="wiki(name)" class="wiki" th:href="${@wiki.url(name)}" target="_blank" rel="noopener"
+   th:title="#{wiki.title}">wiki</a>
+
+<!-- variazione percentuale colorata -->
+<span th:fragment="change(value)" class="change" th:classappend="${@fmt.changeClass(value)}"
+      th:text="${@fmt.change(value)}">+0%</span>
+
+</body>
+</html>
