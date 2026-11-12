@@ -112,7 +112,8 @@ public class BuildsController {
 
     @GetMapping("/builds/view")
     public String view(HttpServletRequest req, Model model,
-                       @RequestParam String ascendancy, @RequestParam String skill) {
+                       @RequestParam String ascendancy, @RequestParam String skill,
+                       @RequestParam(required = false) String tier) {
         League league = currentLeague.get(req);
         if (league == null) {
             return "unavailable";
@@ -126,7 +127,9 @@ public class BuildsController {
         model.addAttribute("skill", skill);
         model.addAttribute("analysis", latest.orElse(null));
         model.addAttribute("result", result.orElse(null));
-        model.addAttribute("views", result.map(r -> views.views(r, league)).orElse(List.of()));
+        AnalysisResult.Tier t = AnalysisResult.Tier.parse(tier);
+        model.addAttribute("tier", t.param());
+        model.addAttribute("views", result.map(r -> views.views(r, league, t)).orElse(List.of()));
         model.addAttribute("overall", result.map(AnalysisResult::overall).orElse(null));
         model.addAttribute("overallUniques", result.map(AnalysisResult::overall)
                 .map(o -> views.pricedUniques(o.uniques(), league)).orElse(List.of()));

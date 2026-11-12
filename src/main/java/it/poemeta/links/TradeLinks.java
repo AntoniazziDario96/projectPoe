@@ -45,13 +45,29 @@ public class TradeLinks {
     }
 
     /**
-     * Link al trade per item gialli simili.
+     * Link al trade per item gialli simili, senza valori minimi.
      *
      * @param league   nome della lega (es. "Mirage")
      * @param baseType base dell'item (es. "Hubris Circlet"), può essere null
      * @param mods     mod normalizzati ("+# to maximum Life")
      */
     public TradeLink similarRares(String league, String baseType, List<String> mods) {
+        return rare(league, baseType, mods.stream().map(m -> new ModFilter(m, null)).toList(), null, null);
+    }
+
+    /** Un mod richiesto, con il valore minimo (null = qualsiasi valore). */
+    public record ModFilter(String mod, Double min) {
+    }
+
+    /**
+     * Link al trade per un item giallo: stessa base, tutti i mod richiesti con il valore minimo
+     * e, se indicate, le resistenze minime come totale "pseudo" (in quel caso i singoli mod di
+     * resistenza non vengono richiesti uno per uno, così il trade trova qualsiasi combinazione).
+     *
+     * @param minEleRes   resistenze elementali totali minime sull'item, null = nessun filtro
+     * @param minChaosRes resistenza al chaos minima sull'item, null = nessun filtro
+     */
+    public TradeLink rare(String league, String baseType, List<ModFilter> mods, Double minEleRes, Double minChaosRes) {
         Map<String, List<String>> ids = ids();
         ObjectNode root = mapper.createObjectNode();
         ObjectNode query = root.putObject("query");
@@ -62,9 +78,16 @@ public class TradeLinks {
         ArrayNode stats = query.putArray("stats");
         List<String> searched = new ArrayList<>();
         List<String> missing = new ArrayList<>();
-        for (String mod : mods) {
-            List<String> alternatives = ids.getOrDefault(mod, ids.get(mod + " (Local)"));
-            if (alternatives == null || alternatives.isEmpty()) {
+        boolean pseudoRes = (minEleRes != null && minEleRes > 0) || (minChaosRes != null && minChaosRes > 0);
+        for (ModFilter f : mods) {
+            String mod = f.mod();
+            if (pseudoRes && ModText.isResistance(mod)) {
+                continue; // coperto dal totale delle resistenze
+            }
+            // lo stesso testo può essere globale o "locale" (es. ES piatto su un casco): vanno bene entrambi
+            List<String> alternatives = new ArrayList<>(ids.getOrDefault(mod, List.of()));
+            alternatives.addAll(ids.getOrDefault(mod + " (Local)", List.of()));
+            if (alternatives.isEmpty()) {
                 missing.add(mod);
                 continue;
             }
@@ -73,24 +96,52 @@ public class TradeLinks {
             group.put("type", "count");
             group.putObject("value").put("min", 1);
             ArrayNode fs = group.putArray("filters");
-            alternatives.forEach(id -> fs.addObject().put("id", id));
+            for (String id : alternatives) {
+                ObjectNode filter = fs.addObject().put("id", id);
+                if (f.min() != null && f.min() > 0) {
+                    filter.putObject("value").put("min", roundDown(f.min()));
+                }
+            }
             searched.add(mod);
         }
-        if (searched.isEmpty()) {
-            stats.addObject().put("type", "and").putArray("filters");
+        ObjectNode and = stats.addObject();
+        and.put("type", "and");
+        ArrayNode andFilters = and.putArray("filters");
+        if (minEleRes != null && minEleRes > 0) {
+            andFilters.addObject().put("id", PSEUDO_ELE_RES).putObject("value").put("min", roundDown(minEleRes));
+        }
+        if (minChaosRes != null && minChaosRes > 0) {
+            andFilters.addObject().put("id", PSEUDO_CHAOS_RES).putObject("value").put("min", roundDown(minChaosRes));
         }
         query.putObject("filters").putObject("type_filters").putObject("filters")
                 .putObject("rarity").put("option", "rare");
         root.putObject("sort").put("price", "asc");
-        return new TradeLink(TRADE_URL + pathEncode(league) + "?q=" + pathEncode(root.toString()),
-                List.copyOf(searched), List.copyOf(missing));
+        String json = root.toString();
+        return new TradeLink(TRADE_URL + pathEncode(league) + "?q=" + pathEncode(json),
+                List.copyOf(searched), List.copyOf(missing), league, json,
+                minEleRes != null && minEleRes > 0 ? roundDown(minEleRes) : null,
+                minChaosRes != null && minChaosRes > 0 ? roundDown(minChaosRes) : null);
     }
+
+    /** Arrotonda per difetto: interi sopra 10, un decimale sotto (es. 1.5% di leech). */
+    static double roundDown(double v) {
+        return v >= 10 ? Math.floor(v) : Math.floor(v * 10) / 10;
+    }
+
+    private static final String PSEUDO_ELE_RES = "pseudo.pseudo_total_elemental_resistance";
+    private static final String PSEUDO_CHAOS_RES = "pseudo.pseudo_total_chaos_resistance";
 
     /**
      * Link al trade con l'elenco dei mod cercati e di quelli che il trade non permette di cercare
      * (es. testi che non hanno una statistica corrispondente).
+     *
+     * @param league     lega usata nella ricerca
+     * @param query      la ricerca in JSON (serve anche per leggere i prezzi dal trade)
+     * @param minEleRes  resistenze elementali minime richieste, null se non filtrate
+     * @param minChaosRes resistenza al chaos minima richiesta, null se non filtrata
      */
-    public record TradeLink(String url, List<String> searchedMods, List<String> missingMods) {
+    public record TradeLink(String url, List<String> searchedMods, List<String> missingMods,
+                            String league, String query, Double minEleRes, Double minChaosRes) {
     }
 
     /** Link al trade per un unique per nome. */

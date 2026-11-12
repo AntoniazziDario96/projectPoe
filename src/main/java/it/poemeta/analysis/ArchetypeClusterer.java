@@ -1,6 +1,8 @@
 package it.poemeta.analysis;
 
 import it.poemeta.analysis.AnalysisResult.Archetype;
+import it.poemeta.analysis.AnalysisResult.Defence;
+import it.poemeta.analysis.AnalysisResult.Range;
 import it.poemeta.analysis.AnalysisResult.ModStat;
 import it.poemeta.analysis.AnalysisResult.RareSlot;
 import it.poemeta.analysis.AnalysisResult.Representative;
@@ -228,6 +230,11 @@ public class ArchetypeClusterer {
         List<Stat> bloodlines = stats(c, i -> profiles.get(i).bloodline() == null ? Set.of()
                 : Set.of(profiles.get(i).bloodline()), Map.of(), 5);
 
+        List<Stat> pantheonMajor = stats(c, i -> profiles.get(i).pantheonMajor() == null ? Set.of()
+                : Set.of(profiles.get(i).pantheonMajor()), Map.of(), 4);
+        List<Stat> pantheonMinor = stats(c, i -> profiles.get(i).pantheonMinor() == null ? Set.of()
+                : Set.of(profiles.get(i).pantheonMinor()), Map.of(), 4);
+
         String label = leftovers ? "Varianti sperimentali" : label(c, profiles, skill, globalLabelFreq);
         double share = (double) size / total;
         return new Archetype(index, label, size, share, leftovers || share < cfg.minorShare(), cohesion,
@@ -236,7 +243,43 @@ public class ArchetypeClusterer {
                 c.stream().mapToInt(i -> profiles.get(i).life()).average().orElse(0),
                 c.stream().mapToInt(i -> profiles.get(i).energyShield()).average().orElse(0),
                 supports, gems, uniques, keystones, masteries, bloodlines,
-                rareSlots(c, profiles));
+                rareSlots(c, profiles), defence(c, profiles), pantheonMajor, pantheonMinor,
+                uniqueSlots(c, profiles));
+    }
+
+    /** Resistenze e suppression medie (solo i personaggi che hanno questi dati). */
+    private static Defence defence(List<Integer> c, List<CharacterProfile> profiles) {
+        double fire = 0, cold = 0, light = 0, chaos = 0, supp = 0;
+        int n = 0;
+        for (int i : c) {
+            CharacterProfile.Defence d = profiles.get(i).defence();
+            if (d == null) {
+                continue;
+            }
+            fire += d.fireRes();
+            cold += d.coldRes();
+            light += d.lightningRes();
+            chaos += d.chaosRes();
+            supp += d.suppression();
+            n++;
+        }
+        return n == 0 ? null : new Defence(fire / n, cold / n, light / n, chaos / n, supp / n, n);
+    }
+
+    /** Slot più comune di ogni unique, per sapere quale item del giocatore sostituisce. */
+    private static Map<String, String> uniqueSlots(List<Integer> c, List<CharacterProfile> profiles) {
+        Map<String, Map<String, Integer>> counts = new HashMap<>();
+        for (int i : c) {
+            for (ItemRef u : profiles.get(i).uniques()) {
+                if (u.slot() != null) {
+                    counts.computeIfAbsent(u.name(), k -> new HashMap<>()).merge(u.slot(), 1, Integer::sum);
+                }
+            }
+        }
+        Map<String, String> out = new HashMap<>();
+        counts.forEach((name, bySlot) -> out.put(name, bySlot.entrySet().stream()
+                .max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null)));
+        return out;
     }
 
     private List<Stat> stats(List<Integer> c, Function<Integer, Set<String>> extractor,
@@ -322,7 +365,13 @@ public class ArchetypeClusterer {
             Map<String, Integer> bases = new HashMap<>();
             Map<String, Integer> modCount = new HashMap<>();
             Map<String, double[]> modValues = new HashMap<>();
+            Map<String, List<Double>> modSamples = new HashMap<>();
+            List<Double> eleRes = new ArrayList<>();
+            List<Double> chaosRes = new ArrayList<>();
             for (RareItem r : items) {
+                ModText.Resists res = ModText.resists(r.mods());
+                eleRes.add(res.elemental());
+                chaosRes.add(res.chaos());
                 bases.merge(r.baseType(), 1, Integer::sum);
                 Set<String> seen = new HashSet<>();
                 for (String mod : r.mods()) {
@@ -336,6 +385,10 @@ public class ArchetypeClusterer {
                         double[] acc = modValues.computeIfAbsent(key, k -> new double[2]);
                         acc[0] += v;
                         acc[1]++;
+                    }
+                    Double value = ModText.value(mod);
+                    if (value != null) {
+                        modSamples.computeIfAbsent(key, k -> new ArrayList<>()).add(value);
                     }
                 }
             }
@@ -352,10 +405,11 @@ public class ArchetypeClusterer {
                     .map(e -> {
                         double[] acc = modValues.get(e.getKey());
                         Double avg = acc == null || acc[1] == 0 ? null : acc[0] / acc[1];
-                        return new ModStat(e.getKey(), (double) e.getValue() / n, avg);
+                        return new ModStat(e.getKey(), (double) e.getValue() / n, avg,
+                                Range.of(modSamples.get(e.getKey())));
                     })
                     .toList();
-            out.add(new RareSlot(slot, n, pct, baseStats, mods));
+            out.add(new RareSlot(slot, n, pct, baseStats, mods, Range.of(eleRes), Range.of(chaosRes)));
         });
         return out;
     }

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{fragments :: head(#{nav.compare})}"></head>
+<body>
+<header th:replace="~{fragments :: header('compare')}"></header>
+<main>
+    <h1 th:text="#{compare.heading}">Confronta il tuo personaggio</h1>
+    <p class="muted" th:text="#{compare.intro}"></p>
+
+    <div class="notice error" th:if="${error != null}"
+         th:text="#{__${error.key}__(${error.args.length > 0 ? error.args[0] : ''}, ${error.args.length > 1 ? error.args[1] : ''})}"></div>
+
+    <div class="grid two">
+        <section class="card">
+            <form th:action="@{/compare/import}" method="post" data-source-form>
+                <div class="tabs" role="tablist">
+                    <label class="tab"><input type="radio" name="source" value="pob" th:checked="${form.source != 'ninja'}" data-source-tab>
+                        <span>Path of Building</span></label>
+                    <label class="tab"><input type="radio" name="source" value="ninja" th:checked="${form.source == 'ninja'}" data-source-tab>
+                        <span>poe.ninja</span></label>
+                </div>
+
+                <div data-source-panel="pob">
+                    <label class="field">
+                        <span th:text="#{compare.pob.label}">Codice o link PoB</span>
+                        <textarea name="pob" rows="5" class="copy" th:placeholder="#{compare.pob.placeholder}" th:text="${form.pob}"></textarea>
+                    </label>
+                    <p class="small muted" th:text="#{compare.pob.help}"></p>
+                </div>
+
+                <div data-source-panel="ninja">
+                    <label class="field">
+                        <span th:text="#{compare.ninja.account}">Account</span>
+                        <input type="text" name="account" th:value="${form.account}" placeholder="Nome#1234" autocomplete="off">
+                    </label>
+                    <label class="field">
+                        <span th:text="#{compare.ninja.character}">Personaggio</span>
+                        <input type="text" name="character" th:value="${form.character}" autocomplete="off">
+                    </label>
+                    <p class="small muted" th:text="#{compare.ninja.help(${league.name})}"></p>
+                </div>
+
+                <label class="small"><input type="checkbox" name="save" value="true" th:checked="${form.save}">
+                    <span th:text="#{compare.save}">Salva il personaggio per confrontarlo di nuovo</span></label>
+                <label class="field">
+                    <span class="small" th:text="#{compare.label}">Nome (facoltativo)</span>
+                    <input type="text" name="label" th:value="${form.label}" maxlength="80">
+                </label>
+                <button class="btn" type="submit" th:text="#{compare.submit}">Confronta</button>
+            </form>
+        </section>
+
+        <section class="card">
+            <h3 th:text="#{compare.saved}">Personaggi salvati</h3>
+            <p class="muted small" th:if="${saved.isEmpty()}" th:text="#{compare.saved.empty}"></p>
+            <table th:if="${!saved.isEmpty()}">
+                <tbody>
+                <tr th:each="s : ${saved}">
+                    <td>
+                        <a th:href="@{/compare/{id}(id=${s.id})}" th:text="${s.label}">Nome</a>
+                        <div class="small muted">
+                            <span th:text="${s.source == 'ninja'} ? 'poe.ninja' : 'Path of Building'"></span>
+                            <span th:if="${s.skill != null}" th:text="' · ' + ${s.skill} + ' ' + ${s.ascendancy}"></span>
+                        </div>
+                    </td>
+                    <td class="small muted nowrap" th:text="${@fmt.ago(s.updatedAt)}"></td>
+                    <td class="small nowrap">
+                        <span th:if="${s.lastCount != null}" th:text="#{compare.changes(${s.lastCount})}"></span>
+                    </td>
+                    <td>
+                        <form th:action="@{/compare/{id}/delete(id=${s.id})}" method="post"
+                              th:attr="data-confirm=#{compare.delete.confirm}">
+                            <button class="btn secondary small" type="submit" th:text="#{compare.delete}">Elimina</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </section>
+    </div>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

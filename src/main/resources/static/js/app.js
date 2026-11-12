@@ -112,3 +112,90 @@ document.addEventListener('click', async (e) => {
     if (!el) return;
     setTimeout(() => location.reload(), Number(el.dataset.autoReload) || 4000);
 })();
+
+// Confronta: scelta della fonte (PoB / poe.ninja)
+(function () {
+    const form = document.querySelector('[data-source-form]');
+    if (!form) return;
+    function show() {
+        const checked = form.querySelector('[data-source-tab]:checked');
+        const source = checked ? checked.value : 'pob';
+        form.querySelectorAll('[data-source-panel]').forEach((p) => {
+            p.hidden = p.dataset.sourcePanel !== source;
+        });
+    }
+    form.querySelectorAll('[data-source-tab]').forEach((r) => r.addEventListener('change', show));
+    show();
+})();
+
+// Form che si inviano da soli quando cambia una scelta
+document.querySelectorAll('[data-autosubmit]').forEach((form) => {
+    form.addEventListener('change', () => form.submit());
+});
+
+// Conferma prima di azioni come "Elimina"
+document.addEventListener('submit', (e) => {
+    const msg = e.target.dataset && e.target.dataset.confirm;
+    if (msg && !window.confirm(msg)) e.preventDefault();
+});
+
+// Confronta: prezzi dei gialli letti dal trade, uno alla volta, poi riordino per prezzo
+(function () {
+    const table = document.querySelector('[data-suggestions]');
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+    const byPrice = table.dataset.sortByPrice === 'true';
+    const texts = (window.I18N && window.I18N.price) || {};
+
+    function resort() {
+        if (!byPrice) return;
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.sort((a, b) => {
+            const pa = a.dataset.price === undefined || a.dataset.price === '' ? Infinity : Number(a.dataset.price);
+            const pb = b.dataset.price === undefined || b.dataset.price === '' ? Infinity : Number(b.dataset.price);
+            return pa - pb;
+        });
+        rows.forEach((r) => tbody.appendChild(r));
+    }
+
+    async function load() {
+        const rows = Array.from(tbody.querySelectorAll('tr[data-price-token]'));
+        for (const row of rows) {
+            const cell = row.querySelector('[data-price-cell]');
+            try {
+                const res = await fetch('/api/compare/price/' + encodeURIComponent(row.dataset.priceToken),
+                    { headers: { 'Accept': 'application/json' } });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    row.dataset.price = data.chaos;
+                    cell.textContent = data.text;
+                } else {
+                    cell.innerHTML = '';
+                    const span = document.createElement('span');
+                    span.className = 'muted small';
+                    span.textContent = texts[data.status] || '–';
+                    cell.appendChild(span);
+                    if (data.status === 'league') {
+                        // la lega non è sul trade: inutile cercare gli altri
+                        rows.filter((r) => r !== row && r.dataset.priceToken).forEach((r) => {
+                            const c = r.querySelector('[data-price-cell]');
+                            c.innerHTML = '';
+                            const s2 = document.createElement('span');
+                            s2.className = 'muted small';
+                            s2.textContent = texts.league || '–';
+                            c.appendChild(s2);
+                            delete r.dataset.priceToken;
+                        });
+                        break;
+                    }
+                }
+            } catch (err) {
+                cell.textContent = '–';
+            }
+            delete row.dataset.priceToken;
+            resort();
+        }
+    }
+    resort();
+    load();
+})();

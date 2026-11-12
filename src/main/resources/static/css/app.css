@@ -190,3 +190,38 @@ details summary { cursor: pointer; color: var(--link); }
     .quicksearch { max-width: none; }
     h1 { font-size: 1.35rem; }
 }
+
+/* ------------------------------------------------------------ confronta */
+.tabs { display: flex; gap: .4rem; margin-bottom: .8rem; }
+.tab input { position: absolute; opacity: 0; pointer-events: none; }
+.tab span {
+    display: inline-block; padding: .35rem .8rem; border: 1px solid var(--border); border-radius: 6px;
+    cursor: pointer; background: var(--surface-2);
+}
+.tab input:checked + span { border-color: var(--accent-2); color: var(--accent); font-weight: 600; }
+.tab input:focus-visible + span { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.field { display: block; margin: .5rem 0; }
+.field > span { display: block; margin-bottom: .25rem; }
+.field input[type=text], .field textarea { width: 100%; box-sizing: border-box; }
+.inline-form { display: flex; gap: .4rem; align-items: center; }
+.inline-form input { max-width: 180px; }
+.inline-details > summary { list-style: none; }
+.inline-details > summary::-webkit-details-marker { display: none; }
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; margin: 1rem 0; }
+.summary-box {
+    display: flex; flex-direction: column; gap: .15rem; padding: .7rem .9rem; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); position: relative; padding-left: 2rem;
+}
+.summary-box .dot { position: absolute; left: .8rem; top: .95rem; width: .6rem; height: .6rem; border-radius: 50%; background: var(--muted, #888); }
+.summary-box.ok .dot { background: #4caf50; }
+.summary-box.warn .dot { background: #e0a030; }
+.summary-box.bad .dot { background: #e05050; }
+.notices { list-style: none; padding: 0; margin: 0 0 .6rem; }
+.notices li { padding: .35rem .6rem; border-left: 3px solid var(--border); margin: .3rem 0; }
+.notices li.bad { border-left-color: #e05050; }
+.notices li.warn { border-left-color: #e0a030; }
+.notices li.ok { border-left-color: #4caf50; }
+details.mods ul { margin: .3rem 0 0; padding-left: 1.1rem; }
+details.mods li.missing { color: #e07070; }
+details.mods li.ok { color: inherit; opacity: .75; }
+.small-bar { width: 70px; display: inline-block; vertical-align: middle; margin-right: .3rem; }

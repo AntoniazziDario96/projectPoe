@@ -344,7 +344,11 @@ public class AnalysisService {
         Duration maxAge = Duration.ofHours(props.builds().characterCacheHours());
         if (cached.isPresent() && cached.get().getProfileJson() != null
                 && cached.get().getFetchedAt().plus(maxAge).isAfter(Instant.now())) {
-            return mapper.readValue(cached.get().getProfileJson(), CharacterProfile.class);
+            CharacterProfile p = mapper.readValue(cached.get().getProfileJson(), CharacterProfile.class);
+            // i profili salvati dalle versioni precedenti non hanno resistenze e pantheon: si riscaricano
+            if (p.defence() != null) {
+                return p;
+            }
         }
         CharacterProfile p = ProfileExtractor.extract(
                 client.character(league.snapshotVersion(), league.url(), ref.account(), ref.name()));

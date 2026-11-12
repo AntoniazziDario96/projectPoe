@@ -69,6 +69,13 @@ public class BuildViewService {
     }
 
     public List<ArchetypeView> views(AnalysisResult r, League league) {
+        return views(r, league, AnalysisResult.Tier.MID);
+    }
+
+    /**
+     * @param tier valori minimi richiesti ai mod e alle resistenze nei link al trade dei gialli
+     */
+    public List<ArchetypeView> views(AnalysisResult r, League league, AnalysisResult.Tier tier) {
         String eco = league.economyName();
         Double divine = eco == null ? null : economy.divinePrice(eco).orElse(null);
         double core = props.archetypes().coreThreshold();
@@ -108,7 +115,7 @@ public class BuildViewService {
             for (RareSlot slot : a.rareSlots()) {
                 String base = slot.bases().isEmpty() ? null : slot.bases().get(0).name();
                 List<String> mods = DemandService.profileMods(slot);
-                TradeLink link = eco == null ? null : trade.similarRares(eco, base, mods);
+                TradeLink link = eco == null ? null : rareLink(eco, base, slot, mods, tier);
                 rares.add(new RareSlotView(slot.slot(), slot.count(), slot.pctOfArchetype(), slot.bases(),
                         slot.mods(), mods, link));
             }
@@ -134,6 +141,20 @@ public class BuildViewService {
             return new PricedStat(s.name(), s.pct(), p.map(PriceLine::icon).orElse(null),
                     p.map(PriceLine::chaos).orElse(null), s.pct() >= core);
         }).toList();
+    }
+
+    /** Link al trade per il giallo tipico: mod ai valori del tier e resistenze obbligatorie. */
+    private TradeLink rareLink(String eco, String base, RareSlot slot, List<String> mods, AnalysisResult.Tier tier) {
+        List<TradeLinks.ModFilter> filters = new ArrayList<>();
+        for (String mod : mods) {
+            Double min = slot.mods().stream().filter(m -> m.text().equals(mod)).findFirst()
+                    .map(m -> m.values() != null ? m.values().pick(tier) : null).orElse(null);
+            filters.add(new TradeLinks.ModFilter(mod, min));
+        }
+        Double ele = slot.eleRes() == null ? null : slot.eleRes().pick(tier);
+        Double chaos = slot.chaosRes() == null ? null : slot.chaosRes().pick(tier);
+        return trade.rare(eco, base, filters, ele != null && ele >= 10 ? ele : null,
+                chaos != null && chaos >= 10 ? chaos : null);
     }
 
     private static List<PricedStat> plain(List<Stat> stats, double core) {

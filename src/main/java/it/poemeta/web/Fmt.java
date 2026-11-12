@@ -106,6 +106,14 @@ public class Fmt {
         return v == null ? "–" : String.format(locale(), "%.1f", v);
     }
 
+    /** Valore di un mod: intero se lo è, altrimenti con un decimale. */
+    public String val(Double v) {
+        if (v == null) {
+            return "–";
+        }
+        return v == Math.rint(v) ? String.format(locale(), "%.0f", v) : String.format(locale(), "%.1f", v);
+    }
+
     public String slot(String slot) {
         return slot == null ? "" : msg("slot." + slot, slot);
     }

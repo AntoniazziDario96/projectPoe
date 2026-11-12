@@ -3,10 +3,12 @@ package it.poemeta.analysis;
 import java.util.List;
 
 /**
- * Le informazioni di un personaggio che servono all'analisi, estratte dal JSON di poe.ninja.
+ * Le informazioni di un personaggio che servono all'analisi, estratte dal JSON di poe.ninja
+ * (o da un codice Path of Building).
  *
  * @param skillGroups gruppi di gemme collegate (nomi delle gemme, esclusi i supporti "built-in")
  * @param passives    id dei nodi dell'albero passivo allocati
+ * @param defence     resistenze e suppression (null nei profili salvati dalle versioni precedenti)
  */
 public record CharacterProfile(
         String account,
@@ -22,9 +24,15 @@ public record CharacterProfile(
         List<String> keystones,
         List<String> masteries,
         List<ItemRef> uniques,
-        List<RareItem> rares) {
+        List<RareItem> rares,
+        Defence defence,
+        String pantheonMajor,
+        String pantheonMinor) {
 
-    public record ItemRef(String name, String icon) {
+    /**
+     * @param slot slot dell'unique (Helm, Ring, Flask, Jewel, ...), null nei profili vecchi
+     */
+    public record ItemRef(String name, String icon, String slot) {
     }
 
     /**
@@ -34,6 +42,11 @@ public record CharacterProfile(
      * @param mods mod espliciti (inclusi fractured e crafted) con i valori reali
      */
     public record RareItem(String slot, String baseType, String name, String icon, List<String> mods) {
+    }
+
+    /** Resistenze finali (già limitate dal massimo), massimi e spell suppression. */
+    public record Defence(int fireRes, int coldRes, int lightningRes, int chaosRes,
+                          int fireMax, int coldMax, int lightningMax, int suppression) {
     }
 
     /**

@@ -71,7 +71,7 @@ class ArchetypeClustererTest {
         CharacterProfile p = new CharacterProfile("acc", "x", 90, "Chieftain", null, 1, 0, null,
                 List.of(List.of("Shield Charge", "Faster Attacks Support"),
                         List.of("Vaal Righteous Fire", "Burning Damage Support", "Efficacy Support")),
-                List.of(), List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null);
         assertThat(p.supportsOf("Righteous Fire")).containsExactly("Burning Damage Support", "Efficacy Support");
     }
 
@@ -84,8 +84,9 @@ class ArchetypeClustererTest {
 
     private static CharacterProfile profile(String name, List<String> mainGroup, List<Integer> passives, String unique) {
         return new CharacterProfile("acc-" + name, name, 95, "Chieftain", null, 5000, 0, "pob",
-                List.of(mainGroup), passives, List.of(), List.of(), List.of(new ItemRef(unique, null)),
+                List.of(mainGroup), passives, List.of(), List.of(), List.of(new ItemRef(unique, null, "Helm")),
                 List.of(new RareItem("Helm", "Hubris Circlet", "Doom Crown", null,
-                        List.of("+" + (90 + name.length()) + " to maximum Life", "+40% to Fire Resistance"))));
+                        List.of("+" + (90 + name.length()) + " to maximum Life", "+40% to Fire Resistance"))),
+                null, null, null);
     }
 }

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{fragments :: head(${entry.label})}"></head>
+<body>
+<header th:replace="~{fragments :: header('compare')}"></header>
+<main>
+    <p class="small"><a th:href="@{/compare}" th:text="#{compare.back}">← Confronta</a></p>
+    <div class="archetype-head">
+        <h1>
+            <span th:text="${entry.label}">Personaggio</span>
+            <span class="muted small" th:text="${ch.profile.ascendancy} + ' · lv ' + ${ch.profile.level}"></span>
+        </h1>
+        <div style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:flex-start">
+            <form th:if="${entry.source == 'ninja'}" th:action="@{/compare/{id}/refresh(id=${entry.id})}" method="post">
+                <button class="btn secondary small" type="submit" th:text="#{compare.refresh.ninja}">Aggiorna da poe.ninja</button>
+            </form>
+            <details th:if="${entry.source != 'ninja'}" class="inline-details">
+                <summary class="btn secondary small" th:text="#{compare.refresh.pob}">Aggiorna il PoB</summary>
+                <form th:action="@{/compare/{id}/refresh(id=${entry.id})}" method="post" class="card" style="margin-top:.4rem">
+                    <textarea name="pob" rows="3" class="copy" th:placeholder="#{compare.pob.placeholder}"></textarea>
+                    <button class="btn small" type="submit" th:text="#{compare.refresh.submit}">Aggiorna</button>
+                </form>
+            </details>
+            <form th:if="${!entry.saved}" th:action="@{/compare/{id}/save(id=${entry.id})}" method="post" class="inline-form">
+                <input type="text" name="label" th:value="${entry.label}" maxlength="80" th:attr="aria-label=#{compare.label}">
+                <button class="btn small" type="submit" th:text="#{compare.saveNow}">Salva</button>
+            </form>
+            <span th:if="${entry.saved}" class="pill core" th:text="#{compare.isSaved}">salvato</span>
+        </div>
+    </div>
+
+    <div class="notice" th:if="${param.updated != null}" th:text="#{compare.updated}"></div>
+    <div class="notice error" th:if="${refreshError != null}" th:text="#{__${refreshError}__('', '')}"></div>
+    <div class="notice" th:if="${entry.previousCount != null and changeCount != null}"
+         th:text="#{compare.progress(${entry.previousCount}, ${changeCount})}"></div>
+
+    <form method="get" class="filters" data-autosubmit>
+        <label class="small"><span th:text="#{compare.pair}">Build</span>
+            <select name="pair">
+                <option th:if="${!pairs.containsKey(pairKey)}" th:value="${pairKey}" selected
+                        th:text="${(skill != null ? skill : '?') + ' · ' + asc} + ' ' + #{compare.pair.notAnalysed}"></option>
+                <option th:each="p : ${pairs}" th:value="${p.key}" th:text="${p.value}" th:selected="${p.key == pairKey}"></option>
+            </select>
+        </label>
+        <label class="small" th:if="${result != null}"><span th:text="#{compare.archetype}">Archetipo</span>
+            <select name="arch">
+                <option th:each="m, st : ${result.matches}" th:value="${m.index}"
+                        th:selected="${m.index == result.archetype.index}"
+                        th:text="${@fmt.archetype(m.label)} + ' (' + #{compare.similarity(${@fmt.pct(m.score)}, ${@fmt.pct(m.items)})} + ')' + (${st.first and chosenArch == null} ? ' ★' : '')"></option>
+            </select>
+        </label>
+        <label class="small"><span th:text="#{compare.tier}">Tier dei mod</span>
+            <select name="tier">
+                <option value="high" th:selected="${tier == 'high'}" th:text="#{compare.tier.high}">Alto</option>
+                <option value="mid" th:selected="${tier == 'mid'}" th:text="#{compare.tier.mid}">Medio</option>
+                <option value="low" th:selected="${tier == 'low'}" th:text="#{compare.tier.low}">Basso</option>
+            </select>
+        </label>
+        <label class="small"><span th:text="#{compare.sort}">Ordine</span>
+            <select name="sort">
+                <option value="price" th:selected="${sort != 'diff'}" th:text="#{compare.sort.price}">Prezzo</option>
+                <option value="diff" th:selected="${sort == 'diff'}" th:text="#{compare.sort.diff}">Differenza</option>
+            </select>
+        </label>
+        <noscript><button class="btn small" type="submit" th:text="#{compare.apply}">Applica</button></noscript>
+    </form>
+    <p class="small muted" th:text="#{compare.tier.help}"></p>
+
+    <!-- coppia non analizzata -->
+    <th:block th:if="${result == null}">
+        <section class="card" th:if="${running != null}" th:attr="data-analysis-progress=${asc + '|' + skill}">
+            <div class="small"><strong th:text="#{common.analysesRunning}">Analisi in corso</strong> —
+                <span class="muted" data-progress-label th:text="${@fmt.status(running.message)}"></span></div>
+            <div class="progress" style="margin-top:.4rem"><span th:style="'width:' + ${running.progressPercent} + '%'"></span></div>
+            <p class="small muted" style="margin:.4rem 0 0" th:text="#{view.reloadWhenDone}"></p>
+        </section>
+        <div class="notice error" th:if="${running == null and skill == null}" th:text="#{compare.noSkill}"></div>
+        <div class="notice" th:if="${running == null and skill != null}">
+            <span th:text="#{compare.notAnalysed(${skill}, ${asc})}"></span>
+            <form th:action="@{/builds/run}" method="post" style="display:inline">
+                <input type="hidden" name="ascendancy" th:value="${asc}">
+                <input type="hidden" name="skill" th:value="${skill}">
+                <button class="btn small" type="submit" th:text="#{builds.analyze}">Analizza</button>
+            </form>
+        </div>
+    </th:block>
+
+    <th:block th:if="${result != null}">
+        <div class="notice" th:if="${result.oldAnalysis}" th:text="#{compare.oldAnalysis}"></div>
+
+        <div class="summary">
+            <div class="summary-box" th:each="area : ${ {'defence', 'gems', 'items', 'tree'} }"
+                 th:with="lvl=${area == 'defence' ? result.summary.defence : (area == 'gems' ? result.summary.gems : (area == 'items' ? result.summary.items : result.summary.tree))}"
+                 th:classappend="${lvl}">
+                <span class="dot"></span>
+                <strong th:text="#{__${'compare.area.' + area}__}">Area</strong>
+                <span class="small muted" th:text="#{__${'compare.level.' + lvl}__}"></span>
+            </div>
+        </div>
+
+        <section class="card">
+            <h3 th:text="#{compare.area.defence}">Difese</h3>
+            <ul class="notices">
+                <li th:each="n : ${result.defence}" th:classappend="${n.level}"
+                    th:text="#{__${n.key}__(${n.a0}, ${n.a1}, ${n.a2})}"></li>
+            </ul>
+            <p class="small muted" style="margin-bottom:0" th:if="${result.pantheon != null}">
+                <strong th:text="#{compare.pantheon}">Pantheon</strong>:
+                <span th:text="#{compare.pantheon.yours(${result.pantheon.playerMajor ?: '–'}, ${result.pantheon.playerMinor ?: '–'})}"></span>
+                <th:block th:if="${result.pantheon.majorDifferent() or result.pantheon.minorDifferent()}">
+                    — <span th:text="#{compare.pantheon.suggest(${result.pantheon.major ?: '–'}, ${@fmt.pct(result.pantheon.majorPct)}, ${result.pantheon.minor ?: '–'}, ${@fmt.pct(result.pantheon.minorPct)})}"></span>
+                </th:block>
+                <th:block th:unless="${result.pantheon.majorDifferent() or result.pantheon.minorDifferent()}">
+                    — <span th:text="#{compare.pantheon.same}"></span>
+                </th:block>
+            </p>
+        </section>
+
+        <section class="card">
+            <h3><span th:text="#{compare.items}">Item da cambiare</span>
+                <span class="muted small" th:text="'(' + ${items.size()} + ')'"></span></h3>
+            <p class="small muted" th:text="#{compare.items.help(${@fmt.archetype(result.archetype.label)})}"></p>
+            <p class="muted" th:if="${items.isEmpty()}" th:text="#{compare.items.none}"></p>
+            <div class="table-wrap" th:if="${!items.isEmpty()}">
+                <table data-suggestions th:attr="data-sort-by-price=${sort != 'diff'}">
+                    <thead>
+                    <tr>
+                        <th>Slot</th>
+                        <th th:text="#{compare.col.current}">Attuale</th>
+                        <th th:text="#{compare.col.suggested}">Consigliato</th>
+                        <th class="right" th:text="#{compare.col.diff}">Differenza</th>
+                        <th class="right" th:text="#{common.price}">Prezzo</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="s : ${items}" th:attr="data-price-token=${s.priceToken}, data-price=${s.priceChaos}">
+                        <td class="nowrap" th:text="${s.slot != null} ? ${@fmt.slot(s.slot)} : '–'"></td>
+                        <td>
+                            <th:block th:if="${s.current != null}">
+                                <span th:classappend="${s.current.isUnique()} ? 'unique-name' : (${s.current.isRare()} ? 'rare-name' : '')"
+                                      th:text="${s.current.displayName()}"></span>
+                                <div class="small muted" th:if="${s.current.name != null}" th:text="${s.current.baseType}"></div>
+                            </th:block>
+                            <span th:if="${s.current == null}" class="muted small" th:text="#{compare.empty}">vuoto</span>
+                        </td>
+                        <td>
+                            <span class="item-name">
+                                <img class="icon" th:if="${s.kind == 'unique' and s.icon != null}" th:src="${s.icon}" alt="" loading="lazy">
+                                <span th:if="${s.kind == 'unique'}" class="unique-name" th:text="${s.target}"></span>
+                                <span th:if="${s.kind == 'rare'}" class="rare-name"
+                                      th:text="${s.target != null} ? #{compare.rareOf(${s.target})} : #{compare.rare}"></span>
+                            </span>
+                            <th:block th:if="${s.kind == 'unique'}"><a th:replace="~{fragments :: wiki(${s.target})}"></a></th:block>
+                            <div class="small muted" th:text="#{__${s.reason}__(${@fmt.pct(s.usage)})}"></div>
+                            <details th:if="${!s.mods.isEmpty()}" class="mods">
+                                <summary class="small" th:text="#{compare.mods(${s.mods.size()})}">Mod richiesti</summary>
+                                <ul class="small">
+                                    <li th:each="m : ${s.mods}" th:classappend="${m.ok} ? 'ok' : 'missing'">
+                                        <span th:if="${m.resistance}" th:text="${m.mod == 'ele'} ? #{compare.mod.ele} : #{compare.mod.chaos}"></span>
+                                        <span th:unless="${m.resistance}" th:text="${m.mod}"></span>
+                                        <span class="muted" th:text="#{compare.mod.values(${m.min != null ? @fmt.val(m.min) : '–'}, ${m.current != null ? @fmt.val(m.current) : '–'})}"></span>
+                                        <span class="pill warn" th:if="${s.missingMods.contains(m.mod)}"
+                                              th:title="#{common.notSearchable.title}" th:text="#{common.notSearchable}"></span>
+                                    </li>
+                                </ul>
+                                <p class="small muted" style="margin:.2rem 0 0" th:if="${s.minEleRes != null}"
+                                   th:text="#{compare.mod.resNote(${@fmt.val(s.minEleRes)})}"></p>
+                            </details>
+                        </td>
+                        <td class="right nowrap">
+                            <div class="bar small-bar" th:title="${@fmt.pct(s.diff)}"><span th:style="'width:' + ${s.diff * 100} + '%'"></span></div>
+                            <span class="small" th:text="${@fmt.pct(s.diff)}"></span>
+                        </td>
+                        <td class="right nowrap" data-price-cell>
+                            <span th:if="${s.priceChaos != null}" th:text="${@fmt.price(s.priceChaos, divinePrice)}"></span>
+                            <span th:if="${s.priceChaos == null and s.priceToken != null}" class="muted small" th:text="#{compare.price.loading}">…</span>
+                            <span th:if="${s.priceChaos == null and s.priceToken == null}" class="muted small">–</span>
+                        </td>
+                        <td>
+                            <a class="btn secondary small nowrap" th:if="${s.tradeUrl != null}" th:href="${s.tradeUrl}"
+                               target="_blank" rel="noopener" th:text="#{compare.buy}">Compra</a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="small muted" style="margin-bottom:0" th:text="#{compare.price.note}"></p>
+        </section>
+
+        <div class="grid two">
+            <section class="card">
+                <h3 th:text="#{compare.area.gems}">Gemme</h3>
+                <ul class="notices" th:if="${!result.gemNotices.isEmpty()}">
+                    <li th:each="n : ${result.gemNotices}" th:classappend="${n.level}"
+                        th:text="#{__${n.key}__(${n.a0}, ${n.a1}, ${n.a2})}"></li>
+                </ul>
+                <p class="small muted" th:if="${result.gems.isEmpty() and result.gemNotices.isEmpty()}" th:text="#{compare.gems.ok}"></p>
+                <table th:if="${!result.gems.isEmpty()}">
+                    <thead><tr><th th:text="#{compare.gems.missing}">Supporti mancanti</th><th class="right" th:text="#{compare.col.usage}">Usata da</th><th class="right" th:text="#{common.price}">Prezzo</th></tr></thead>
+                    <tbody>
+                    <tr th:each="g : ${result.gems}">
+                        <td><span class="gem-name" th:text="${@fmt.support(g.name)}"></span><a th:replace="~{fragments :: wiki(${g.name})}"></a></td>
+                        <td class="right" th:text="${@fmt.pct(g.pct)}"></td>
+                        <td class="right nowrap" th:text="${@fmt.price(g.priceChaos, divinePrice)}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="card">
+                <h3 th:text="#{compare.area.tree}">Albero passivo</h3>
+                <p class="small muted" th:if="${!result.keystonesKnown}" th:text="#{compare.tree.unknown}"></p>
+                <p class="small muted" th:if="${result.keystonesKnown and result.missingKeystones.isEmpty()}" th:text="#{compare.tree.ok}"></p>
+                <th:block th:if="${!result.missingKeystones.isEmpty()}">
+                    <p class="small" th:text="#{compare.tree.missing}"></p>
+                    <div class="chips">
+                        <span class="pill core" th:each="k : ${result.missingKeystones}">
+                            <span th:text="${k}"></span><a th:replace="~{fragments :: wiki(${k})}"></a>
+                        </span>
+                    </div>
+                </th:block>
+                <p class="small" style="margin-bottom:0">
+                    <a th:href="@{/builds/view(ascendancy=${result.analysis.ascendancy},skill=${result.analysis.skill})} + '#arch-' + ${result.archetype.index}"
+                       th:text="#{compare.seeArchetype}">Vedi l'archetipo completo →</a>
+                </p>
+            </section>
+        </div>
+    </th:block>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

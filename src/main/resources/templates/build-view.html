@@ -118,6 +118,20 @@
             </div>
         </section>
 
+        <form method="get" class="filters" data-autosubmit>
+            <input type="hidden" name="ascendancy" th:value="${ascendancy}">
+            <input type="hidden" name="skill" th:value="${skill}">
+            <label class="small"><span th:text="#{view.tier}">Tier dei mod</span>
+                <select name="tier">
+                    <option value="high" th:selected="${tier == 'high'}" th:text="#{compare.tier.high}">Alto</option>
+                    <option value="mid" th:selected="${tier == 'mid'}" th:text="#{compare.tier.mid}">Medio</option>
+                    <option value="low" th:selected="${tier == 'low'}" th:text="#{compare.tier.low}">Basso</option>
+                </select>
+            </label>
+            <noscript><button class="btn small" type="submit" th:text="#{compare.apply}">Applica</button></noscript>
+            <span class="small muted" th:text="#{compare.tier.help}"></span>
+        </form>
+
         <section class="card">
             <h3 th:text="#{view.archetypes}">Archetipi</h3>
             <div class="table-wrap">

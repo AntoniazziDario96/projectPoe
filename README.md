@@ -66,11 +66,47 @@ Per usare un'altra porta: imposta la variabile d'ambiente `PORT` (es. `PORT=9090
      **core** (≥ 70% dei personaggi) e **flessibili**;
    - **item gialli per slot**: basi e mod più frequenti. I mod del profilo (presenti in almeno
      il 40% degli item, massimo 6) sono in **grassetto**, gli altri in grigio; il link
-     **"Vedi item simili"** cerca sul trade la base con **tutti** i mod in grassetto;
+     **"Vedi item simili"** cerca sul trade la base con **tutti** i mod in grassetto, ai valori
+     del **tier** scelto (alto / medio / basso) e con le **resistenze obbligatorie**;
    - **gemme costose da comprare** e **costo stimato** della build (unique e gemme core ai prezzi attuali);
    - lista di unique/gemme da copiare (per esempio su Discord).
 6. **Estendi analisi** aggiunge altri 200 personaggi per avere dati più precisi.
 7. Con la ☆ una coppia diventa **preferita** e si aggiorna da sola ogni 6 ore.
+
+### Confronta (pagina *Confronta*)
+
+Confronta il **tuo personaggio** con le build analizzate e ti dice cosa cambiare.
+
+1. Importa il personaggio in uno di due modi:
+   - **Path of Building**: incolla il codice (Import/Export Build → Generate) oppure un link
+     **pobb.in**, **pastebin** o **poe.ninja/pob**;
+   - **poe.ninja**: account (anche nella forma `Nome#1234`) e nome del personaggio, che deve essere
+     pubblico e indicizzato da poe.ninja nella lega scelta in alto.
+2. Il sito sceglie la coppia skill + ascendancy del personaggio (la puoi cambiare) e
+   l'**archetipo più simile** (anche questo si può cambiare dal menu).
+3. In alto c'è un **semaforo** per difese, gemme, item e albero passivo. Sotto trovi:
+   - **avvisi sulle difese**: resistenze elementali sotto il massimo (quanto manca), chaos,
+     spell suppression, vita ed ES molto più bassi della media dell'archetipo;
+   - **item da cambiare**, ordinati per **prezzo** (o per differenza): unique usati da almeno
+     metà dei giocatori che non hai, e gialli troppo diversi da quelli dei giocatori analizzati.
+     Per ogni giallo vedi i mod richiesti con il valore minimo e il tuo, e il pulsante
+     **Compra** apre il trade già compilato;
+   - **gemme di supporto** "core" che mancano e link troppo corti;
+   - **keystone** usate dalla maggior parte dei giocatori che non hai;
+   - **pantheon** più usato, se l'analisi lo contiene.
+4. Il **tier** (alto / medio / basso) decide i valori minimi richiesti ai mod e alle resistenze
+   dei gialli: alto = come il 25% migliore dei giocatori analizzati, medio = come la metà,
+   basso = come il 25% peggiore. Le resistenze sono sempre obbligatorie (come totale, in qualsiasi
+   combinazione) e se ti mancano resistenze la parte mancante viene aggiunta alle ricerche.
+5. I **prezzi** degli unique vengono da poe.ninja; quelli dei gialli dal trade ufficiale
+   (mediana dei 5 annunci più economici), letti uno alla volta per rispettare i limiti del trade.
+   Le leghe evento che non sono sul trade (es. Allflame) non hanno prezzi dei gialli.
+6. Spunta **Salva** per ritrovare il personaggio nella pagina e confrontarlo di nuovo dopo
+   qualche upgrade (**Aggiorna da poe.ninja** o **Aggiorna il PoB**): il sito ti dice quanti
+   cambi consigliati avevi prima e quanti ne hai ora.
+
+Le analisi fatte prima di questa versione non hanno tier dei mod, resistenze per slot, difese medie
+e pantheon: la pagina lo segnala e basta rifare l'analisi della build.
 
 ### Item richiesti (pagina *Item richiesti*)
 
@@ -168,6 +204,8 @@ poe.ninja non ha un'API pubblica documentata: il sito usa gli stessi endpoint de
 | Dizionari della ricerca | `/poe1/api/builds/dictionary/{hash}` | binario "NDIC" |
 | Dettaglio personaggio | `/poe1/api/builds/{versione}/character` | JSON |
 | Id dei mod per il trade | `https://www.pathofexile.com/api/trade/data/stats` | JSON |
+| Prezzi dei gialli (pagina Confronta) | `https://www.pathofexile.com/api/trade/search` e `/fetch` | JSON |
+| Nomi di keystone e mastery (PoB) | `raw.githubusercontent.com/grindinggear/skilltree-export` (salvato in `data/`) | JSON |
 
 Note:
 
@@ -179,7 +217,10 @@ Note:
   (`RateLimitedHttp`), e i personaggi già scaricati vengono riutilizzati. Per rispetto
   verso poe.ninja, non abbassare troppo `request-delay-ms`.
 - Gli item gialli non hanno un prezzo su poe.ninja: per questo il costo stimato include
-  solo unique e gemme, e per i gialli c'è il link al trade.
+  solo unique e gemme, e per i gialli c'è il link al trade. Nella pagina Confronta il prezzo
+  dei gialli si legge dal trade ufficiale, che ha limiti severi (chi li supera viene bloccato
+  fino a 30 minuti): il sito rispetta i limiti che il trade comunica, tiene i prezzi in cache per
+  30 minuti e, se dovrebbe aspettare troppo, mostra "trade occupato" invece di insistere.
 - Nei primi giorni di una lega (o negli eventi) poe.ninja può non avere ancora i prezzi
   di unique e gemme: in quel caso le relative sezioni restano vuote.
 
@@ -214,7 +255,8 @@ src/main/java/it/poemeta
 ├── league/                      elenco leghe
 ├── economy/                     prezzi, variazioni, storico
 ├── analysis/                    coppie skill+ascendancy, analisi, archetipi, item richiesti
-├── links/                       link a PoE Wiki e trade ufficiale
+├── compare/                     import da PoB / poe.ninja e confronto con gli archetipi
+├── links/                       link a PoE Wiki e trade ufficiale, prezzi dei gialli dal trade
 ├── persistence/                 entità JPA e repository (H2 su file)
 └── web/                         controller e preparazione dati per le pagine
 src/main/resources
@@ -238,7 +280,7 @@ Il database si può ispezionare da http://localhost:8080/h2-console
 
 ## Idee per le prossime versioni
 
-- Confronto tra il proprio personaggio e l'archetipo (cosa manca: gemme, nodi, oggetti).
+- Budget: proporre il miglior insieme di cambi entro una cifra scelta dal giocatore.
 - Ordine di progressione (gemme e oggetti per fascia di livello).
 - Avvisi di prezzo (desktop o Discord).
 - Diario delle sessioni di farm con profitto/ora reale.

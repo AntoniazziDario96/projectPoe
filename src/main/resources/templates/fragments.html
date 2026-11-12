@@ -9,7 +9,16 @@
         try { document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark'; } catch (e) { document.documentElement.dataset.theme = 'dark'; }
     </script>
     <script th:inline="javascript">
-        window.I18N = { copied: /*[[#{common.copied}]]*/ 'Copiato!' };
+        window.I18N = {
+            copied: /*[[#{common.copied}]]*/ 'Copiato!',
+            price: {
+                busy: /*[[#{compare.price.busy}]]*/ '',
+                league: /*[[#{compare.price.league}]]*/ '',
+                none: /*[[#{compare.price.none}]]*/ '',
+                down: /*[[#{compare.price.down}]]*/ '',
+                expired: '–'
+            }
+        };
     </script>
     <script th:src="@{/js/app.js}" defer></script>
 </head>
@@ -20,6 +29,7 @@
     <nav class="nav">
         <a th:href="@{/}" th:classappend="${active == 'home'} ? 'active'" th:text="#{nav.home}">Novità</a>
         <a th:href="@{/builds}" th:classappend="${active == 'builds'} ? 'active'" th:text="#{nav.builds}">Build</a>
+        <a th:href="@{/compare}" th:classappend="${active == 'compare'} ? 'active'" th:text="#{nav.compare}">Confronta</a>
         <a th:href="@{/demand}" th:classappend="${active == 'demand'} ? 'active'" th:text="#{nav.demand}">Item richiesti</a>
         <a th:href="@{/currency}" th:classappend="${active == 'currency'} ? 'active'" th:text="#{nav.currency}">Currency</a>
         <a th:href="@{/uniques}" th:classappend="${active == 'uniques'} ? 'active'" th:text="#{nav.uniques}">Unique</a>
