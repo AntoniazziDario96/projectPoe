@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{fragments :: head(#{nav.trends})}"></head>
+<body>
+<header th:replace="~{fragments :: header('trends')}"></header>
+<main>
+    <h1><span th:text="#{trends.heading}">Tendenze</span> · <span th:text="${league.name}">Lega</span></h1>
+    <p class="muted" th:text="#{trends.intro}"></p>
+
+    <div class="notice" th:if="${trends == null or trends.pairsCompared == 0}">
+        <span th:text="#{trends.noData(${trends == null ? 0 : trends.pairsAnalysed})}"></span>
+        <a th:href="@{/builds}" th:text="#{nav.builds}">Build</a>
+    </div>
+
+    <th:block th:if="${trends != null and trends.pairsCompared > 0}">
+        <div class="stats-row">
+            <span><strong th:text="${trends.pairsCompared}">0</strong> <span th:text="#{trends.pairs}">build confrontate</span></span>
+            <span th:if="${trends.since != null}"><span th:text="#{trends.since}">dal</span>
+                <strong th:text="${@fmt.ago(trends.since)}">ieri</strong></span>
+        </div>
+        <div class="notice" th:if="${noUniquePrices}" th:text="#{common.noUniquePrices(${league.name})}"></div>
+
+        <div class="grid two">
+            <section class="card" th:each="block : ${ {'buy', 'sell'} }"
+                     th:with="list=${block == 'buy' ? trends.buy : trends.sell}">
+                <h3 th:text="#{__${'trends.' + block}__}">Da comprare</h3>
+                <p class="small muted" style="margin-top:0" th:text="#{__${'trends.' + block + '.help'}__}"></p>
+                <p class="muted small" th:if="${list.isEmpty()}" th:text="#{trends.none}"></p>
+                <div class="table-wrap" th:if="${!list.isEmpty()}">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Unique</th>
+                            <th class="right" th:text="#{trends.col.players}">Giocatori</th>
+                            <th class="right" th:text="#{common.price}">Prezzo</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="t : ${list}">
+                            <td>
+                                <span class="item-name">
+                                    <img class="icon" th:if="${t.icon != null}" th:src="${t.icon}" alt="" loading="lazy">
+                                    <span class="unique-name" th:text="${t.name}"></span>
+                                </span>
+                                <a class="wiki" th:href="${tradeUrls.get(t.name)}" th:if="${tradeUrls.get(t.name) != null}"
+                                   target="_blank" rel="noopener">trade</a>
+                                <div class="small muted" th:if="${!t.builds.isEmpty()}"
+                                     th:text="${#strings.listJoin(t.builds, ', ')}"></div>
+                            </td>
+                            <td class="right nowrap">
+                                <span th:replace="~{fragments :: change(${t.usageChange})}"></span>
+                                <div class="small muted" th:text="${@fmt.num(T(java.lang.Math).round(t.playersBefore))} + ' → ' + ${@fmt.num(T(java.lang.Math).round(t.playersNow))}"></div>
+                            </td>
+                            <td class="right nowrap">
+                                <span th:replace="~{fragments :: change(${t.priceChange})}"></span>
+                                <span class="muted small" th:if="${t.approxPrice}" th:title="#{trends.approx}">*</span>
+                                <div class="small muted" th:text="${@fmt.price(t.priceNow, divinePrice)}"></div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+        <p class="small muted" th:text="#{trends.note}"></p>
+    </th:block>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+</body>
+</html>

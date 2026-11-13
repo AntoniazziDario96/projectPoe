@@ -64,11 +64,13 @@ public record CompareResult(
      * @param priceChaos prezzo stimato in chaos (null se non ancora noto)
      * @param priceToken id per leggere il prezzo dal trade in un secondo momento (gialli), null se già noto
      * @param minEleRes  resistenze elementali minime richieste al giallo, null se nessuna
+     * @param impact     quanto avvicina alla build (0-1.25): usato dal piano con budget per scegliere
+     *                   i cambi che valgono di più rispetto al prezzo
      */
     public record ItemSuggestion(String slot, String kind, String reason, EquippedItem current, String target,
                                  String icon, double diff, double usage, Double priceChaos, String priceToken,
                                  String tradeUrl, List<ModCheck> mods, Double minEleRes, Double minChaosRes,
-                                 List<String> missingMods) {
+                                 List<String> missingMods, double impact) {
     }
 
     /** Gemma di supporto "core" che manca nel gruppo della skill principale. */

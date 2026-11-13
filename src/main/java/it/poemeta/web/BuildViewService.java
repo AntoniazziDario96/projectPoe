@@ -2,6 +2,7 @@ package it.poemeta.web;
 
 import it.poemeta.analysis.AnalysisResult;
 import it.poemeta.analysis.AnalysisResult.Archetype;
+import it.poemeta.analysis.AnalysisResult.Member;
 import it.poemeta.analysis.AnalysisResult.ModStat;
 import it.poemeta.analysis.AnalysisResult.RareSlot;
 import it.poemeta.analysis.AnalysisResult.Stat;
@@ -19,8 +20,13 @@ import org.springframework.stereotype.Service;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Prepara un risultato di analisi per la pagina: aggiunge prezzi attuali, costo stimato
@@ -65,7 +71,94 @@ public class BuildViewService {
                                 List<PricedStat> gemsToBuy, List<PricedStat> keystones,
                                 List<PricedStat> masteries, List<PricedStat> bloodlines,
                                 List<RareSlotView> rareSlots, Double costChaos, Double costDivine,
-                                int unpricedUniques, String profileUrl, String itemList) {
+                                int unpricedUniques, String profileUrl, String itemList,
+                                BudgetVersion budget, String budgetStatus) {
+    }
+
+    /**
+     * Versione economica dell'archetipo: il personaggio "tipico" che spende meno in unique.
+     *
+     * @param cost       costo dei suoi unique ai prezzi attuali (chaos)
+     * @param typicalCost quanto spende in unique il personaggio tipico a metà classifica
+     * @param skips      unique comuni nell'archetipo che lui non usa (i più cari per primi)
+     * @param uses       i suoi unique con il prezzo
+     * @param unpriced   unique senza prezzo (non contati nel costo)
+     */
+    public record BudgetVersion(Member member, double cost, double typicalCost, List<PricedStat> uses,
+                                List<PricedStat> skips, int unpriced, String profileUrl) {
+
+        /** Quanto si risparmia rispetto al personaggio tipico (0-1). */
+        public double saving() {
+            return typicalCost <= 0 ? 0 : Math.max(0, 1 - cost / typicalCost);
+        }
+    }
+
+    /** Un personaggio conta come "tipico" se non è nel quarto meno simile del gruppo. */
+    static final double TYPICAL_QUANTILE = 0.25;
+    /** Livelli sotto la media oltre i quali un personaggio non è considerato (build non finite). */
+    static final int MAX_LEVEL_GAP = 5;
+    /** Unique comuni: usati da almeno questa quota dell'archetipo. */
+    static final double COMMON_UNIQUE = 0.5;
+
+    /**
+     * Trova la versione economica. Restituisce null se l'archetipo non ha i membri (analisi vecchia)
+     * o se nessuno dei suoi unique ha un prezzo.
+     */
+    static BudgetVersion budgetVersion(Archetype a, Function<String, Double> price, String profileUrlPrefix) {
+        List<Member> members = a.members();
+        if (members == null || members.isEmpty()) {
+            return null;
+        }
+        List<Double> sims = members.stream().map(Member::similarity).sorted().toList();
+        double minSim = sims.get((int) Math.floor((sims.size() - 1) * TYPICAL_QUANTILE));
+        List<Member> typical = members.stream()
+                .filter(m -> m.similarity() >= minSim - 1e-9 && m.level() >= a.avgLevel() - MAX_LEVEL_GAP)
+                .toList();
+        if (typical.size() < 2) {
+            typical = members;
+        }
+        boolean anyPrice = false;
+        List<double[]> costs = new ArrayList<>(); // [costo, indice]
+        for (int i = 0; i < typical.size(); i++) {
+            double cost = 0;
+            for (String u : typical.get(i).uniques()) {
+                Double p = price.apply(u);
+                if (p != null) {
+                    cost += p;
+                    anyPrice = true;
+                }
+            }
+            costs.add(new double[]{cost, i});
+        }
+        if (!anyPrice) {
+            return null;
+        }
+        costs.sort(Comparator.comparingDouble(c -> c[0]));
+        Member cheapest = typical.get((int) costs.get(0)[1]);
+        double typicalCost = costs.get(costs.size() / 2)[0];
+
+        List<PricedStat> uses = new ArrayList<>();
+        int unpriced = 0;
+        Set<String> used = new HashSet<>();
+        for (String u : cheapest.uniques()) {
+            used.add(u.toLowerCase(Locale.ROOT));
+            Double p = price.apply(u);
+            if (p == null) {
+                unpriced++;
+            }
+            uses.add(new PricedStat(u, 0, null, p, false));
+        }
+        uses.sort(Comparator.comparing((PricedStat s) -> s.chaos() == null ? 0 : -s.chaos()));
+        List<PricedStat> skips = new ArrayList<>();
+        for (Stat s : a.uniques()) {
+            if (s.pct() >= COMMON_UNIQUE && !used.contains(s.name().toLowerCase(Locale.ROOT))) {
+                skips.add(new PricedStat(s.name(), s.pct(), s.icon(), price.apply(s.name()), true));
+            }
+        }
+        skips.sort(Comparator.comparing((PricedStat s) -> s.chaos() == null ? 0 : -s.chaos()));
+        String url = profileUrlPrefix == null ? null
+                : profileUrlPrefix + enc(cheapest.account()) + "/" + enc(cheapest.name());
+        return new BudgetVersion(cheapest, costs.get(0)[0], typicalCost, uses, skips, unpriced, url);
     }
 
     public List<ArchetypeView> views(AnalysisResult r, League league) {
@@ -122,9 +215,15 @@ public class BuildViewService {
             // senza nessun prezzo disponibile (es. lega appena iniziata) il costo non ha senso
             Double costChaos = eco == null || priced == 0 ? null : cost;
             Double costDivine = costChaos == null || divine == null || divine <= 0 ? null : costChaos / divine;
+            Function<String, Double> uniquePrice = name -> eco == null ? null
+                    : economy.uniquePrice(eco, name).map(PriceLine::chaos).orElse(null);
+            BudgetVersion budget = budgetVersion(a, uniquePrice,
+                    "https://poe.ninja/poe1/builds/" + league.url() + "/character/");
+            String budgetStatus = a.members() == null ? "old" : (budget == null ? "noPrices" : "ok");
             out.add(new ArchetypeView(a, plain(a.supports(), core), uniques, gemsToBuy,
                     plain(a.keystones(), core), plain(a.masteries(), core), plain(a.bloodlines(), core),
-                    rares, costChaos, costDivine, unpriced, profileUrl(league, a), itemList(r, a, core)));
+                    rares, costChaos, costDivine, unpriced, profileUrl(league, a), itemList(r, a, core),
+                    budget, budgetStatus));
         }
         return out;
     }

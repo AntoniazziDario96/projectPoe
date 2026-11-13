@@ -194,6 +194,37 @@
                         </details>
                     </div>
 
+                    <div class="section-title" th:text="#{view.budget}">Versione economica</div>
+                    <div class="budget-version" th:if="${v.budget != null}" th:with="b=${v.budget}">
+                        <p style="margin:0">
+                            <a th:href="${b.profileUrl}" target="_blank" rel="noopener" th:text="${b.member.name}">Nome</a>
+                            <span class="muted small" th:text="#{view.budget.stats(${b.member.level}, ${@fmt.num(b.member.life)}, ${@fmt.num(b.member.energyShield)}, ${@fmt.pct(b.member.similarity)})}"></span>
+                        </p>
+                        <p class="small" style="margin:.3rem 0">
+                            <span th:text="#{view.budget.cost(${@fmt.price(b.cost, divinePrice)}, ${@fmt.price(b.typicalCost, divinePrice)})}"></span>
+                            <strong class="change up" th:if="${b.saving() >= 0.05}" th:text="'−' + ${@fmt.pct(b.saving())}"></strong>
+                        </p>
+                        <th:block th:if="${!b.skips.isEmpty()}">
+                            <div class="small muted" th:text="#{view.budget.skips}">Rinuncia a</div>
+                            <div class="chips" style="margin:.2rem 0 .4rem">
+                                <span class="pill" th:each="u : ${b.skips}">
+                                    <span class="unique-name" th:text="${u.name}"></span>
+                                    <span class="muted" th:text="${@fmt.price(u.chaos, divinePrice)}"></span>
+                                </span>
+                            </div>
+                        </th:block>
+                        <div class="small muted" th:text="#{view.budget.uses}">Usa</div>
+                        <div class="chips" style="margin-top:.2rem">
+                            <span class="pill" th:each="u : ${b.uses}">
+                                <span class="unique-name" th:text="${u.name}"></span>
+                                <span class="muted" th:text="${@fmt.price(u.chaos, divinePrice)}"></span>
+                            </span>
+                            <span class="muted small" th:if="${b.uses.isEmpty()}" th:text="#{view.budget.noUniques}"></span>
+                        </div>
+                    </div>
+                    <p class="small muted" th:if="${v.budgetStatus == 'old'}" th:text="#{view.budget.old}"></p>
+                    <p class="small muted" th:if="${v.budgetStatus == 'noPrices'}" th:text="#{view.budget.noPrices}"></p>
+
                     <div class="section-title" th:text="#{view.supports}">Gemme di supporto della skill</div>
                     <div class="chips">
                         <span th:each="s : ${v.supports}" class="pill" th:classappend="${s.core} ? 'core'">

@@ -108,6 +108,16 @@ public record AnalysisResult(
                                  String pobCode, double avgSimilarity) {
     }
 
+    /**
+     * Riepilogo di un personaggio dell'archetipo, per trovare la versione più economica
+     * ai prezzi del momento.
+     *
+     * @param similarity somiglianza media con gli altri personaggi dell'archetipo (0-1)
+     */
+    public record Member(String account, String name, int level, int life, int energyShield,
+                         double similarity, List<String> uniques) {
+    }
+
     /** Difese medie dei personaggi dell'archetipo (null nelle analisi vecchie). */
     public record Defence(double fireRes, double coldRes, double lightningRes, double chaosRes,
                           double suppression, int count) {
@@ -115,6 +125,7 @@ public record AnalysisResult(
 
     /**
      * @param uniqueSlots slot più comune di ogni unique (es. "Helm", "Flask", "Jewel")
+     * @param members     i personaggi dell'archetipo (null nelle analisi vecchie)
      */
     public record Archetype(
             int index,
@@ -137,6 +148,7 @@ public record AnalysisResult(
             Defence defence,
             List<Stat> pantheonMajor,
             List<Stat> pantheonMinor,
-            Map<String, String> uniqueSlots) {
+            Map<String, String> uniqueSlots,
+            List<Member> members) {
     }
 }

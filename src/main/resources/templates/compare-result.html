@@ -121,6 +121,20 @@
                 <span class="muted small" th:text="'(' + ${items.size()} + ')'"></span></h3>
             <p class="small muted" th:text="#{compare.items.help(${@fmt.archetype(result.archetype.label)})}"></p>
             <p class="muted" th:if="${items.isEmpty()}" th:text="#{compare.items.none}"></p>
+            <div class="budget" th:if="${!items.isEmpty()}" data-budget th:attr="data-divine=${divinePrice}">
+                <label class="budget-input">
+                    <span th:text="#{compare.budget}">Budget</span>
+                    <input type="number" min="0" step="any" inputmode="decimal" data-budget-input
+                           th:placeholder="#{compare.budget.placeholder}">
+                    <select data-budget-unit th:attr="aria-label=#{compare.budget.unit}">
+                        <option value="div" th:if="${divinePrice != null}">div</option>
+                        <option value="c">chaos</option>
+                    </select>
+                    <button class="btn small" type="button" data-budget-apply th:text="#{compare.budget.apply}">Calcola</button>
+                </label>
+                <p class="small muted" data-budget-result th:text="#{compare.budget.help}"></p>
+                <ol class="budget-list" data-budget-list hidden></ol>
+            </div>
             <div class="table-wrap" th:if="${!items.isEmpty()}">
                 <table data-suggestions th:attr="data-sort-by-price=${sort != 'diff'}">
                     <thead>
@@ -134,8 +148,11 @@
                     </tr>
                     </thead>
                     <tbody>
-                    <tr th:each="s : ${items}" th:attr="data-price-token=${s.priceToken}, data-price=${s.priceChaos}">
-                        <td class="nowrap" th:text="${s.slot != null} ? ${@fmt.slot(s.slot)} : '–'"></td>
+                    <tr th:each="s : ${items}" th:attr="data-price-token=${s.priceToken}, data-price=${s.priceChaos}, data-impact=${s.impact}">
+                        <td class="nowrap">
+                            <span th:text="${s.slot != null} ? ${@fmt.slot(s.slot)} : '–'"></span>
+                            <span class="pill core plan-badge" data-plan-badge hidden th:text="#{compare.budget.badge}">nel piano</span>
+                        </td>
                         <td>
                             <th:block th:if="${s.current != null}">
                                 <span th:classappend="${s.current.isUnique()} ? 'unique-name' : (${s.current.isRare()} ? 'rare-name' : '')"

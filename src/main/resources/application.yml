@@ -25,6 +25,18 @@ spring:
     basename: messages
     encoding: UTF-8
     fallback-to-system-locale: false
+  web:
+    resources:
+      # CSS e JS con un "hash" del contenuto nell'URL (app-<hash>.css): dopo un aggiornamento
+      # il browser scarica subito i file nuovi invece di usare quelli in cache
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: /css/**,/js/**
+      cache:
+        cachecontrol:
+          max-age: 365d
 
 logging:
   level:

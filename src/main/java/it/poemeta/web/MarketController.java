@@ -3,6 +3,7 @@ package it.poemeta.web;
 import it.poemeta.analysis.AnalysisService;
 import it.poemeta.analysis.DemandService;
 import it.poemeta.analysis.DemandService.DemandItem;
+import it.poemeta.analysis.TrendService;
 import it.poemeta.economy.EconomyService;
 import it.poemeta.economy.EconomyService.Period;
 import it.poemeta.economy.EconomyService.Snapshot;
@@ -32,9 +33,11 @@ public class MarketController {
     private final AnalysisService analyses;
     private final TradeLinks trade;
     private final Fmt fmt;
+    private final TrendService trendService;
 
     public MarketController(CurrentLeague currentLeague, EconomyService economy, DemandService demand,
-                            AnalysisService analyses, TradeLinks trade, Fmt fmt) {
+                            AnalysisService analyses, TradeLinks trade, Fmt fmt, TrendService trendService) {
+        this.trendService = trendService;
         this.currentLeague = currentLeague;
         this.economy = economy;
         this.demand = demand;
@@ -52,7 +55,9 @@ public class MarketController {
         }
         if (league.hasEconomy()) {
             String eco = league.economyName();
-            model.addAttribute("snapshot", economy.snapshot(eco));
+            Snapshot snap = economy.snapshot(eco);
+            model.addAttribute("snapshot", snap);
+            model.addAttribute("noUniquePrices", noUniquePrices(snap));
             model.addAttribute("currencyUp", economy.movers(eco, economy.currencyFilter(), Period.DAY, true, 8));
             model.addAttribute("currencyDown", economy.movers(eco, economy.currencyFilter(), Period.DAY, false, 8));
             model.addAttribute("uniquesUp", economy.movers(eco, economy.uniqueFilter(), Period.WEEK, true, 8));
@@ -70,6 +75,14 @@ public class MarketController {
         return "index";
     }
 
+    /**
+     * poe.ninja non ha i prezzi degli unique per alcune leghe (per esempio gli eventi):
+     * le sezioni degli unique restano vuote e lo diciamo invece di mostrare un riquadro vuoto.
+     */
+    static boolean noUniquePrices(Snapshot s) {
+        return s != null && s.lines().stream().noneMatch(PriceLine::isUnique);
+    }
+
     public record FavoriteRow(String ascendancy, String skill, BuildAnalysisEntity last, Double trend, String url) {
     }
 
@@ -79,11 +92,27 @@ public class MarketController {
     }
 
     @GetMapping("/uniques")
-    public String uniques(HttpServletRequest req, Model model, @RequestParam(defaultValue = "week") String period) {
-        return movers(req, model, period, false);
+    public String uniques(HttpServletRequest req, Model model, @RequestParam(defaultValue = "week") String period,
+                          @RequestParam(required = false) String cat) {
+        return movers(req, model, period, false, cat);
+    }
+
+    /** Categorie degli unique su poe.ninja, con la chiave usata nell'URL (?cat=weapon). */
+    static final Map<String, String> UNIQUE_CATEGORIES = new java.util.LinkedHashMap<>();
+
+    static {
+        UNIQUE_CATEGORIES.put("weapon", "UniqueWeapon");
+        UNIQUE_CATEGORIES.put("armour", "UniqueArmour");
+        UNIQUE_CATEGORIES.put("accessory", "UniqueAccessory");
+        UNIQUE_CATEGORIES.put("flask", "UniqueFlask");
+        UNIQUE_CATEGORIES.put("jewel", "UniqueJewel");
     }
 
     private String movers(HttpServletRequest req, Model model, String periodParam, boolean currency) {
+        return movers(req, model, periodParam, currency, null);
+    }
+
+    private String movers(HttpServletRequest req, Model model, String periodParam, boolean currency, String catParam) {
         League league = currentLeague.get(req);
         if (league == null) {
             return "unavailable";
@@ -91,14 +120,21 @@ public class MarketController {
         Period period = "week".equals(periodParam) ? Period.WEEK : Period.DAY;
         model.addAttribute("period", period == Period.WEEK ? "week" : "day");
         model.addAttribute("currencyPage", currency);
+        String category = currency || catParam == null ? null : UNIQUE_CATEGORIES.get(catParam);
+        model.addAttribute("cat", category == null ? "all" : catParam);
+        model.addAttribute("categories", UNIQUE_CATEGORIES.keySet());
         if (!league.hasEconomy()) {
             return "movers";
         }
         String eco = league.economyName();
         Snapshot s = economy.snapshot(eco);
         model.addAttribute("snapshot", s);
+        model.addAttribute("noUniquePrices", !currency && noUniquePrices(s));
         model.addAttribute("refreshing", economy.isRefreshing(eco));
-        var filter = currency ? economy.currencyFilter() : economy.uniqueFilter();
+        java.util.function.Predicate<PriceLine> filter = currency ? economy.currencyFilter() : economy.uniqueFilter();
+        if (category != null) {
+            filter = filter.and(l -> category.equals(l.category()));
+        }
         List<PriceLine> up = economy.movers(eco, filter, period, true, 40);
         List<PriceLine> down = economy.movers(eco, filter, period, false, 40);
         model.addAttribute("up", up);
@@ -117,6 +153,28 @@ public class MarketController {
         model.addAttribute("spark", spark);
         model.addAttribute("tradeUrls", tradeUrls);
         return "movers";
+    }
+
+    /** Tendenze: unique sempre più (o meno) usati nelle build analizzate, con il prezzo ancora fermo. */
+    @GetMapping("/trends")
+    public String trends(HttpServletRequest req, Model model) {
+        League league = currentLeague.get(req);
+        if (league == null) {
+            return "unavailable";
+        }
+        String eco = league.economyName();
+        Snapshot snap = eco == null ? null : economy.snapshot(eco);
+        model.addAttribute("noUniquePrices", noUniquePrices(snap));
+        TrendService.Trends t = trendService.trends(league.url(), eco);
+        model.addAttribute("trends", t);
+        Map<String, String> tradeUrls = new HashMap<>();
+        if (eco != null) {
+            for (List<TrendService.UniqueTrend> list : List.of(t.buy(), t.sell())) {
+                list.forEach(u -> tradeUrls.put(u.name(), trade.unique(eco, u.name())));
+            }
+        }
+        model.addAttribute("tradeUrls", tradeUrls);
+        return "trends";
     }
 
     @GetMapping("/search")

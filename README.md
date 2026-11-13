@@ -1,287 +1,300 @@
 # PoE Meta Advisor
 
-Sito web da far girare **in locale** che analizza il meta delle build e il mercato di
-**Path of Exile 1**, usando i dati pubblici di [poe.ninja](https://poe.ninja).
+A small web app you run **on your own PC** that looks at what people are actually playing and buying in
+**Path of Exile 1**, using public data from [poe.ninja](https://poe.ninja).
 
-Lo scopo è aiutare:
+I made it because I kept doing the same thing by hand every league: open poe.ninja, filter a build,
+open twenty characters, try to work out which rares they wear and what mods matter, then go to
+the trade site and build the search. This does that part for you.
 
-- **chi farma**, a capire cosa sale o scende di prezzo in questo momento;
-- **chi crafta**, a capire quali item gialli vengono usati dalle build più giocate;
-- **chi gioca una build**, a vedere com'è fatta davvero la versione "tipo" giocata dalla maggior parte dei giocatori.
+What it does, in short:
 
-> Progetto amatoriale, non affiliato a Grinding Gear Games né a poe.ninja.
+- **Builds**: pick a skill + ascendancy, it downloads a few hundred characters and groups them into
+  archetypes (the actual variants people play), with the common gems, uniques, keystones and rare items.
+- **Compare**: import your own character (PoB code or poe.ninja) and see what's different from the
+  players of that build: which items to replace first, cheapest first, with a ready-made trade search
+  for each one. Type a budget and it picks the set of upgrades that gets you closest to the build for
+  that money. It also tells you if your resistances aren't capped.
+- **Budget version**: for every archetype, the cheapest character that still plays it the normal way,
+  and which expensive uniques it skips.
+- **Trends**: uniques that more and more players of the analysed builds are using while the price hasn't
+  moved yet (and the opposite: usage dropping, price still high).
+- **Wanted items**: the rare item profiles (slot + base + mods) used by the most players, useful if you craft.
+- **Currency / Uniques**: what's going up or down right now, with a local 30-day price history.
+
+The interface is in English and Italian (switch with the button in the top bar).
+
+![Compare page](docs/screenshots/compare.png)
+
+| Build analysis | Market |
+|---|---|
+| ![Build analysis](docs/screenshots/builds.png) | ![Market](docs/screenshots/market.png) |
+
+> Fan project, not affiliated with Grinding Gear Games or poe.ninja.
 
 ---
 
-## Avvio rapido
+## Running it
 
-Requisiti: **Java 21** (per esempio [Temurin](https://adoptium.net/)). Maven non serve: c'è il Maven Wrapper.
+You need **Java 21** (for example [Temurin](https://adoptium.net/)). You don't need Maven, the wrapper is included.
 
 ```bash
-git clone <url-del-repository>
-cd progettoPoe
+git clone https://github.com/AntoniazziDario96/projectPoe.git
+cd projectPoe
 ```
 
-Su Windows:
+Windows:
 
 ```bash
 mvnw.cmd spring-boot:run
 ```
 
-Su Linux / macOS:
+Linux / macOS:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-Poi apri **http://localhost:8080**.
+Then open **http://localhost:8080**.
 
-Il primo avvio scarica le dipendenze e impiega qualche minuto; i successivi sono veloci.
-I dati (analisi, storico prezzi, preferite) vengono salvati nella cartella `data/`, che
-**non** finisce su GitHub: ognuno ha il suo database.
-
-Per usare un'altra porta: imposta la variabile d'ambiente `PORT` (es. `PORT=9090`).
+The first start downloads the dependencies and takes a few minutes. After that it starts in a few seconds.
+Everything it saves (analyses, price history, saved characters) goes into the `data/` folder next to the project.
+To use another port, set the `PORT` environment variable (e.g. `PORT=9090`).
 
 ---
 
-## Cosa fa
+## Builds
 
-### Build (pagina *Build*)
+1. The **Builds** page lists every skill + ascendancy pair in the league, with how many characters play it.
+   The same skill on two ascendancies counts as two different builds.
+2. Tick one or more pairs and press **Analyse**. For each pair it downloads **200 characters** in the
+   background. This is slow on purpose: about **17 minutes per pair**, because poe.ninja blocks you
+   if you go faster (see [poe.ninja limits](#poeninja-limits)). Analyses are queued, keep running if you
+   close the page, and resume if you restart the app.
+3. The characters are grouped into **archetypes**, groups of players running basically the same build
+   (see [How archetypes work](#how-archetypes-work)). For each archetype you get:
+   - share of the pair and estimated number of players in the league;
+   - a **representative character** (the one most similar to everybody else in the group), with a link to
+     poe.ninja and its **Path of Building code**;
+   - support gems, uniques, keystones, masteries and bloodlines, split into **core** (≥ 70% of players)
+     and optional;
+   - **rare items per slot**: most common bases and mods. The mods in bold are the "profile" of the item
+     (present on at least 40% of them, max 6). **Find similar items** opens the official trade site with
+     those mods already filled in, at the values of the **tier** you chose (high / mid / low), and with
+     resistances as a required total;
+   - expensive gems to buy and an **estimated cost** for the build (core uniques and gems at current prices);
+   - a **budget version**: among the typical characters of the archetype (leaving out the least similar
+     quarter and anyone more than 5 levels under the average), the one whose uniques cost the least at
+     today's prices, compared with what the typical character spends, and the common uniques it does without.
+4. **Extend analysis** adds another 200 characters if you want better numbers.
+5. Star a pair to make it a **favourite**: it gets refreshed by itself every 6 hours.
 
-1. Mostra tutte le **coppie skill + ascendancy** della lega, con numero di personaggi e quota.
-   La stessa skill giocata da due ascendancy diverse è considerata come due build diverse.
-2. Selezioni una o più coppie e premi **Analizza**: per ogni coppia vengono scaricati
-   **200 personaggi** (configurabile) in background, circa **17 minuti a coppia**
-   (vedi [Limiti di poe.ninja](#limiti-di-poeninja)). Le analisi vanno in coda e continuano
-   anche se chiudi la pagina; se riavvii il sito riprendono da dove erano.
-3. Appena finita, l'analisi mostra anche le **statistiche su tutti i personaggi della coppia**
-   (unique, gemme, keystone, anoint, bloodline, slot con item giallo), fornite direttamente da poe.ninja.
-4. I personaggi scaricati vengono raggruppati in **archetipi**, cioè gruppi che giocano sostanzialmente
-   la stessa build (vedi [Come funzionano gli archetipi](#come-funzionano-gli-archetipi)).
-5. Per ogni archetipo vedi:
-   - quota di giocatori e numero stimato nella lega;
-   - **build rappresentativa** (il personaggio più simile a tutti gli altri del gruppo),
-     con link al profilo su poe.ninja e **codice Path of Building** da copiare;
-   - gemme di supporto, unique, keystone, mastery e bloodline, divise in
-     **core** (≥ 70% dei personaggi) e **flessibili**;
-   - **item gialli per slot**: basi e mod più frequenti. I mod del profilo (presenti in almeno
-     il 40% degli item, massimo 6) sono in **grassetto**, gli altri in grigio; il link
-     **"Vedi item simili"** cerca sul trade la base con **tutti** i mod in grassetto, ai valori
-     del **tier** scelto (alto / medio / basso) e con le **resistenze obbligatorie**;
-   - **gemme costose da comprare** e **costo stimato** della build (unique e gemme core ai prezzi attuali);
-   - lista di unique/gemme da copiare (per esempio su Discord).
-6. **Estendi analisi** aggiunge altri 200 personaggi per avere dati più precisi.
-7. Con la ☆ una coppia diventa **preferita** e si aggiorna da sola ogni 6 ore.
+## Compare
 
-### Confronta (pagina *Confronta*)
+Import your character and compare it with an analysed build.
 
-Confronta il **tuo personaggio** con le build analizzate e ti dice cosa cambiare.
+1. Two ways to import:
+   - **Path of Building**: paste the export code, or a **pobb.in**, **pastebin** or **poe.ninja/pob** link;
+   - **poe.ninja**: account name (`Name#1234` works too) and character name. The character has to be
+     public and listed on poe.ninja for the league selected in the top bar.
+2. It picks the skill + ascendancy pair of your character and the **most similar archetype**. You can change both.
+   Similarity is 70% items (slot by slot: how many players of the archetype use the same thing you use there),
+   20% support gems and 10% keystones. Having extra stuff the archetype doesn't use doesn't lower it.
+3. At the top there's a quick status for defences, gems, items and passive tree. Below that:
+   - **defences**: uncapped elemental resistances (and by how much), chaos resistance, spell suppression,
+     life or ES well below the archetype's average;
+   - **items to change**, sorted by **price** (or by how different they are). Two kinds:
+     uniques used by at least half of the players that you don't have, and rares that are too far from
+     what the players use. For each rare you see the required mods with the minimum value and yours,
+     and **Buy** opens the trade search;
+   - missing **core support gems** and links that are too short;
+   - **keystones** most players take and you don't;
+   - the most used **pantheon**, when the analysis has it.
+4. The **tier** sets the minimum values asked on rares: high = what the top 25% of players have,
+   mid = the median, low = the bottom 25%. Resistances are always required (as a total, any combination).
+   If you're missing resistances, the missing amount is split across the suggested rares and added to their
+   searches, so after buying them you end up capped.
+5. **Prices**: uniques come from poe.ninja, rares from the official trade site (median of the 5 cheapest
+   listings for that exact search). Rare prices load one at a time to stay inside the trade site's rate limits.
+   Event leagues that aren't on trade (e.g. Allflame) have no rare prices.
+6. **Budget**: type how much you want to spend (div or chaos) and the rows that fit are highlighted.
+   It doesn't just take the cheapest ones: every change has a value (how many players use that item and how far
+   yours is from theirs, with a bonus for rares that also fix missing resistances) and it picks the combination
+   with the most value that fits the budget. The plan updates as rare prices come in from the trade site.
+7. Tick **Save** to keep the character and compare it again after a few upgrades (**Refresh from poe.ninja**
+   or **Update the PoB**). It tells you how many suggested changes you had last time and how many you have now.
 
-1. Importa il personaggio in uno di due modi:
-   - **Path of Building**: incolla il codice (Import/Export Build → Generate) oppure un link
-     **pobb.in**, **pastebin** o **poe.ninja/pob**;
-   - **poe.ninja**: account (anche nella forma `Nome#1234`) e nome del personaggio, che deve essere
-     pubblico e indicizzato da poe.ninja nella lega scelta in alto.
-2. Il sito sceglie la coppia skill + ascendancy del personaggio (la puoi cambiare) e
-   l'**archetipo più simile** (anche questo si può cambiare dal menu).
-3. In alto c'è un **semaforo** per difese, gemme, item e albero passivo. Sotto trovi:
-   - **avvisi sulle difese**: resistenze elementali sotto il massimo (quanto manca), chaos,
-     spell suppression, vita ed ES molto più bassi della media dell'archetipo;
-   - **item da cambiare**, ordinati per **prezzo** (o per differenza): unique usati da almeno
-     metà dei giocatori che non hai, e gialli troppo diversi da quelli dei giocatori analizzati.
-     Per ogni giallo vedi i mod richiesti con il valore minimo e il tuo, e il pulsante
-     **Compra** apre il trade già compilato;
-   - **gemme di supporto** "core" che mancano e link troppo corti;
-   - **keystone** usate dalla maggior parte dei giocatori che non hai;
-   - **pantheon** più usato, se l'analisi lo contiene.
-4. Il **tier** (alto / medio / basso) decide i valori minimi richiesti ai mod e alle resistenze
-   dei gialli: alto = come il 25% migliore dei giocatori analizzati, medio = come la metà,
-   basso = come il 25% peggiore. Le resistenze sono sempre obbligatorie (come totale, in qualsiasi
-   combinazione) e se ti mancano resistenze la parte mancante viene aggiunta alle ricerche.
-5. I **prezzi** degli unique vengono da poe.ninja; quelli dei gialli dal trade ufficiale
-   (mediana dei 5 annunci più economici), letti uno alla volta per rispettare i limiti del trade.
-   Le leghe evento che non sono sul trade (es. Allflame) non hanno prezzi dei gialli.
-6. Spunta **Salva** per ritrovare il personaggio nella pagina e confrontarlo di nuovo dopo
-   qualche upgrade (**Aggiorna da poe.ninja** o **Aggiorna il PoB**): il sito ti dice quanti
-   cambi consigliati avevi prima e quanti ne hai ora.
+## Wanted items
 
-Le analisi fatte prima di questa versione non hanno tier dei mod, resistenze per slot, difese medie
-e pantheon: la pagina lo segnala e basta rifare l'analisi della build.
+The rare item profiles (slot + base + main mods) used by the archetypes of the pairs you analysed,
+sorted by estimated number of players. Each one has a **Similar items** button that opens the trade site
+with the search filled in (same base, rare, every profile mod, accepted as normal, crafted or fractured).
+Mods the trade site has no filter for are marked as "not searchable".
+It doesn't tell you how to craft them; that part is up to you.
 
-### Item richiesti (pagina *Item richiesti*)
+## Trends
 
-Elenco dei profili di item gialli (slot + base + mod principali) usati dagli archetipi delle
-coppie analizzate, ordinati per numero stimato di giocatori. Per ognuno c'è il pulsante
-**"Item simili"** che apre il trade ufficiale con una ricerca già compilata
-(stessa base, item raro e **tutti** i mod del profilo, ognuno accettato come normale, crafted o fractured).
-Il profilo contiene i mod presenti in almeno il 40% degli item di quello slot (massimo 6, come su un item vero).
-I mod per cui il trade non ha un filtro sono segnati come "non cercabile".
-Il sito non calcola margini o metodi di craft: il come craftare resta a chi crafta.
+For every build you analysed at least twice, it compares how many players use each unique now and in the
+previous analysis (using poe.ninja's numbers for the whole build, not just the sample), adds it up across builds,
+and puts it next to the price change over the same period:
 
-### Currency e Unique
+- **Buy**: usage up by at least 15%, price up by no more than 10%. More people need it, the market hasn't noticed yet.
+- **Sell**: usage down by at least 15%, price not down by more than 10%.
 
-- Currency e frammenti **in crescita e in calo** (24 ore o 7 giorni).
-- Unique in crescita e in calo, con link al trade.
-- Grafico dello **storico a 30 giorni** salvato in locale (si riempie col tempo mentre il sito è acceso).
-- Vengono esclusi gli oggetti con pochi scambi o di valore molto basso, per evitare variazioni casuali.
-- Vengono esclusi anche i **prezzi inaffidabili**: se il volume scambiato (in chaos) è meno del doppio
-  del prezzo, cioè sono passati di mano al massimo un paio di pezzi, il prezzo viene probabilmente da
-  uno scambio isolato. Esempio reale: Fragment of Terror a 25 div con solo ~2.071 c di volume totale.
-  Nella ricerca questi oggetti compaiono con l'etichetta "pochi scambi, prezzo inaffidabile".
-- Per le leghe recenti i prezzi di currency e frammenti vengono dal Currency Exchange, quindi al posto
-  del numero di offerte viene mostrato il **volume scambiato**.
+The starting price comes from the price history saved on your PC; when that doesn't go back far enough it's
+estimated from poe.ninja's 7-day change (marked with `*`). Only builds you analysed count, so the more builds you
+favourite (they're re-analysed every 6 hours), the more useful this gets. It's a hint, not financial advice.
 
-### Ricerca e wiki
+## Currency and uniques
 
-- La barra in alto cerca qualsiasi oggetto con prezzo, variazioni e storico.
-- Ogni oggetto, gemma, base o skill ha un piccolo link **wiki** alla [PoE Wiki](https://www.poewiki.net).
-  Per gli item gialli il link porta alla pagina della base.
+- Currency and fragments **rising and falling** (24 hours or 7 days), uniques rising and falling, with trade links.
+  Uniques can be filtered by type (weapons, armour, accessories, flasks, jewels).
+- A **30-day price chart** stored locally (it fills up over time while the app is running).
+- Items with very few trades or very low value are left out, so random noise doesn't show up as a "trend".
+- **Unreliable prices** are left out too: if the traded volume (in chaos) is less than twice the price,
+  basically one or two items changed hands and the price probably comes from a single trade.
+  Real example: Fragment of Terror at 25 div with ~2,071 c of total volume.
 
-### Altro
+## Other things
 
-- Selettore della **lega** in alto (la scelta viene ricordata).
-- **Tema scuro / chiaro** con il pulsante ◐.
-- Prezzo della Divine Orb sempre visibile in alto.
+- Search bar in the top bar for any priced item, with price, changes and history.
+- Every item, gem, base or skill has a small **wiki** link to the [PoE Wiki](https://www.poewiki.net).
+- League picker (remembered), light / dark theme, Divine Orb price always visible.
 
 ---
 
-## Come funzionano gli archetipi
+## How archetypes work
 
-Per ogni personaggio vengono considerati:
+For each character it looks at:
 
-| Elemento | Peso predefinito |
+| What | Default weight |
 |---|---|
-| Gemme di supporto collegate alla skill principale | 35% |
-| Nodi dell'albero passivo | 35% |
-| Unique, keystone, mastery e bloodline | 30% |
+| Support gems linked to the main skill | 35% |
+| Passive tree nodes | 35% |
+| Uniques, keystones, masteries and bloodlines | 30% |
 
-La **somiglianza** tra due personaggi è la media pesata dell'indice di Jaccard di ogni categoria
-(elementi in comune diviso elementi totali): 0 = niente in comune, 1 = identici.
+The **similarity** between two characters is the weighted average of the Jaccard index of each group
+(things in common divided by total things): 0 = nothing in common, 1 = identical.
 
-Il raggruppamento è **gerarchico ("average linkage")**: si parte con ogni personaggio da solo
-e si uniscono via via i due gruppi più simili, finché la loro somiglianza media supera la soglia
-(0,55 di default). I gruppi con meno di 3 personaggi finiscono in "Varianti sperimentali";
-gli archetipi sotto il 5% della coppia sono segnalati come "variante minore" (dati poco affidabili).
+Grouping is **hierarchical (average linkage)**: every character starts alone and the two most similar
+groups get merged, again and again, until their average similarity drops under the threshold (0.55 by default).
+Groups with fewer than 3 characters go into "Experimental variants". Archetypes under 5% of the pair are
+marked as "minor variant" because there isn't much data behind them.
 
-Il nome di ogni archetipo è dato dai due elementi più caratteristici rispetto al resto della coppia.
+Each archetype is named after the two things that set it apart the most from the rest of the pair.
 
 ---
 
-## Configurazione
+## Configuration
 
-Tutto si regola in [`src/main/resources/application.yml`](src/main/resources/application.yml), sezione `poemeta`:
+Everything is in [`src/main/resources/application.yml`](src/main/resources/application.yml), under `poemeta`:
 
-| Chiave | Default | Significato |
+| Key | Default | Meaning |
 |---|---|---|
-| `request-delay-ms` | 1000 | Pausa tra due richieste a poe.ninja. **Non scendere sotto 500.** |
-| `builds.character-delay-ms` | 5000 | Pausa tra due download di personaggi (vedi [Limiti di poe.ninja](#limiti-di-poeninja)) |
-| `default-league` | auto | Lega di default (`auto` = challenge league più recente) |
-| `builds.sample-size` | 200 | Personaggi per coppia skill + ascendancy |
-| `builds.extend-size` | 200 | Personaggi aggiunti da "Estendi analisi" |
-| `builds.min-characters` | 30 | Coppie con meno personaggi non vengono mostrate |
-| `builds.favorites-refresh-hours` | 6 | Ogni quanto si aggiornano le preferite |
-| `builds.character-cache-hours` | 24 | Per quanto un personaggio scaricato viene riutilizzato |
-| `archetypes.similarity-threshold` | 0.55 | Soglia di somiglianza per lo stesso archetipo (più alta = più archetipi) |
-| `archetypes.weight-*` | 0.35 / 0.35 / 0.30 | Pesi di gemme, albero, oggetti |
-| `archetypes.core-threshold` | 0.70 | Quota oltre la quale un elemento è "core" |
-| `economy.refresh-minutes` | 30 | Ogni quanto aggiornare i prezzi |
-| `economy.history-every-minutes` | 60 | Ogni quanto salvare un punto dello storico |
-| `economy.min-listings` | 10 | Offerte minime (o volume minimo in chaos per il Currency Exchange) per entrare nelle classifiche |
-| `economy.min-chaos-currency` / `min-chaos-unique` | 0.5 / 10 | Valore minimo per entrare nelle classifiche |
+| `request-delay-ms` | 1000 | Pause between two requests to poe.ninja. **Don't go under 500.** |
+| `builds.character-delay-ms` | 5000 | Pause between two character downloads (see [poe.ninja limits](#poeninja-limits)) |
+| `default-league` | auto | Default league (`auto` = newest challenge league) |
+| `builds.sample-size` | 200 | Characters per skill + ascendancy pair |
+| `builds.extend-size` | 200 | Characters added by "Extend analysis" |
+| `builds.min-characters` | 30 | Pairs with fewer characters are hidden |
+| `builds.favorites-refresh-hours` | 6 | How often favourites are refreshed |
+| `builds.character-cache-hours` | 24 | How long a downloaded character is reused |
+| `archetypes.similarity-threshold` | 0.55 | Similarity needed to be in the same archetype (higher = more archetypes) |
+| `archetypes.weight-*` | 0.35 / 0.35 / 0.30 | Weights for gems, tree, items |
+| `archetypes.core-threshold` | 0.70 | Share above which something counts as "core" |
+| `economy.refresh-minutes` | 30 | How often prices are refreshed |
+| `economy.history-every-minutes` | 60 | How often a history point is saved |
+| `economy.min-listings` | 10 | Minimum listings (or chaos volume for the Currency Exchange) to show up in the lists |
+| `economy.min-chaos-currency` / `min-chaos-unique` | 0.5 / 10 | Minimum value to show up in the lists |
 
 ---
 
-## Da dove arrivano i dati
+## Where the data comes from
 
-poe.ninja non ha un'API pubblica documentata: il sito usa gli stessi endpoint del frontend di poe.ninja.
+poe.ninja has no documented public API, so the app calls the same endpoints the poe.ninja website uses.
 
-| Dato | Endpoint | Formato |
+| Data | Endpoint | Format |
 |---|---|---|
-| Leghe e snapshot | `/poe1/api/data/index-state`, `/poe1/api/data/build-index-state` | JSON |
-| Currency e frammenti | `/poe1/api/economy/exchange/current/overview` (leghe recenti) oppure `/poe1/api/economy/stash/current/currency/overview` | JSON |
-| Unique e gemme | `/poe1/api/economy/stash/current/item/overview` | JSON |
-| Ricerca personaggi | `/poe1/api/builds/{versione}/search` | protobuf (max 100 righe) |
-| Dizionari della ricerca | `/poe1/api/builds/dictionary/{hash}` | binario "NDIC" |
-| Dettaglio personaggio | `/poe1/api/builds/{versione}/character` | JSON |
-| Id dei mod per il trade | `https://www.pathofexile.com/api/trade/data/stats` | JSON |
-| Prezzi dei gialli (pagina Confronta) | `https://www.pathofexile.com/api/trade/search` e `/fetch` | JSON |
-| Nomi di keystone e mastery (PoB) | `raw.githubusercontent.com/grindinggear/skilltree-export` (salvato in `data/`) | JSON |
+| Leagues and snapshots | `/poe1/api/data/index-state`, `/poe1/api/data/build-index-state` | JSON |
+| Currency and fragments | `/poe1/api/economy/exchange/current/overview` (recent leagues) or `/poe1/api/economy/stash/current/currency/overview` | JSON |
+| Uniques and gems | `/poe1/api/economy/stash/current/item/overview` | JSON |
+| Character search | `/poe1/api/builds/{version}/search` | protobuf (max 100 rows) |
+| Search dictionaries | `/poe1/api/builds/dictionary/{hash}` | binary "NDIC" |
+| Character details | `/poe1/api/builds/{version}/character` | JSON |
+| Trade stat ids | `https://www.pathofexile.com/api/trade/data/stats` | JSON |
+| Rare prices (Compare page) | `https://www.pathofexile.com/api/trade/search` and `/fetch` | JSON |
+| Keystone and mastery names (PoB import) | `raw.githubusercontent.com/grindinggear/skilltree-export` (cached in `data/`) | JSON |
 
-Note:
+Notes:
 
-- La ricerca restituisce al massimo 100 personaggi: per arrivare a 200 si uniscono più
-  ordinamenti (livello, vita, DPS, energy shield, EHP).
-- **Questi endpoint possono cambiare senza preavviso.** Se qualcosa smette di funzionare,
-  il codice da aggiornare è nel package `it.poemeta.ninja`.
-- Tutte le richieste passano da un unico client con pausa minima tra una e l'altra
-  (`RateLimitedHttp`), e i personaggi già scaricati vengono riutilizzati. Per rispetto
-  verso poe.ninja, non abbassare troppo `request-delay-ms`.
-- Gli item gialli non hanno un prezzo su poe.ninja: per questo il costo stimato include
-  solo unique e gemme, e per i gialli c'è il link al trade. Nella pagina Confronta il prezzo
-  dei gialli si legge dal trade ufficiale, che ha limiti severi (chi li supera viene bloccato
-  fino a 30 minuti): il sito rispetta i limiti che il trade comunica, tiene i prezzi in cache per
-  30 minuti e, se dovrebbe aspettare troppo, mostra "trade occupato" invece di insistere.
-- Nei primi giorni di una lega (o negli eventi) poe.ninja può non avere ancora i prezzi
-  di unique e gemme: in quel caso le relative sezioni restano vuote.
+- The search returns at most 100 characters, so to get 200 it merges several sort orders
+  (level, life, DPS, energy shield, EHP).
+- **These endpoints can change without notice.** If something stops working, the code to fix is in `it.poemeta.ninja`.
+- Every request goes through one client with a minimum pause between calls (`RateLimitedHttp`), and characters
+  already downloaded are reused. Please don't lower `request-delay-ms` too much; poe.ninja is run by one person.
+- Rares have no price on poe.ninja, so the estimated build cost only includes uniques and gems.
+  On the Compare page rare prices come from the official trade site, which has strict limits (go over them and
+  you're locked out for up to 30 minutes). The app follows the limits the trade site sends back, caches prices for
+  30 minutes, and shows "trade busy" instead of waiting too long.
+- In the first days of a league (or in events) poe.ninja may not have unique and gem prices yet, so those
+  sections stay empty.
 
----
+## poe.ninja limits
 
-## Limiti di poe.ninja
+Character details on poe.ninja are behind Cloudflare. Download around 60 characters in a couple of minutes
+and your IP gets blocked for **an hour** (HTTP 429), including the poe.ninja character pages you open in your
+browser from the same PC. That's why:
 
-Il **dettaglio dei singoli personaggi** su poe.ninja è protetto da Cloudflare: scaricando
-circa 60 personaggi in un paio di minuti, l'IP viene bloccato per **un'ora** (risposta 429).
-Il blocco vale anche per le pagine personaggio di poe.ninja aperte dal browser dallo stesso PC.
+- there's a dedicated pause between character downloads (`builds.character-delay-ms`, 5 seconds by default),
+  so 200 characters take about 17 minutes;
+- if poe.ninja asks for a break anyway, the analysis stops, shows when it'll resume, and carries on by itself
+  without losing what it already downloaded;
+- downloaded characters are cached for 24 hours, so analysing the same pair again is much faster.
 
-Per questo:
-
-- tra due download di personaggi c'è una pausa dedicata (`builds.character-delay-ms`, 5 secondi di default):
-  200 personaggi richiedono circa 17 minuti;
-- se poe.ninja chiede comunque una pausa, l'analisi si ferma, mostra l'orario di ripresa e riparte
-  da sola, senza perdere i personaggi già scaricati;
-- i personaggi scaricati restano in cache per 24 ore (`builds.character-cache-hours`), quindi
-  rianalizzare la stessa coppia è molto più veloce.
-
-La ricerca e i prezzi non hanno questo problema e restano veloci.
+Search and prices don't have this problem.
 
 ---
 
-## Struttura del progetto
+## Project layout
 
 ```
 src/main/java/it/poemeta
-├── PoeMetaApplication.java      avvio Spring Boot
-├── config/AppProperties         impostazioni da application.yml
-├── ninja/                       client poe.ninja (HTTP con rate limit, protobuf, dizionari)
-├── league/                      elenco leghe
-├── economy/                     prezzi, variazioni, storico
-├── analysis/                    coppie skill+ascendancy, analisi, archetipi, item richiesti
-├── compare/                     import da PoB / poe.ninja e confronto con gli archetipi
-├── links/                       link a PoE Wiki e trade ufficiale, prezzi dei gialli dal trade
-├── persistence/                 entità JPA e repository (H2 su file)
-└── web/                         controller e preparazione dati per le pagine
+├── PoeMetaApplication.java      Spring Boot entry point
+├── config/                      settings from application.yml, locale (IT/EN)
+├── ninja/                       poe.ninja client (rate-limited HTTP, protobuf, dictionaries)
+├── league/                      league list
+├── economy/                     prices, changes, history
+├── analysis/                    skill+ascendancy pairs, analyses, archetypes, wanted items
+├── compare/                     PoB / poe.ninja import and comparison with archetypes
+├── links/                       PoE Wiki and trade links, rare prices from the trade site
+├── persistence/                 JPA entities and repositories (H2 file database)
+└── web/                         controllers and view models
 src/main/resources
 ├── application.yml
-├── templates/                   pagine Thymeleaf
-└── static/                      CSS e JavaScript
+├── messages*.properties         Italian and English texts
+├── templates/                   Thymeleaf pages
+└── static/                      CSS and JavaScript
 ```
 
-Tecnologie: Java 21, Spring Boot 3.5, Thymeleaf, Spring Data JPA, H2.
+Java 21, Spring Boot 3.5, Thymeleaf, Spring Data JPA, H2. No frontend framework, just server-rendered pages
+and a bit of plain JavaScript.
 
-Test:
+Tests:
 
 ```bash
 ./mvnw test
 ```
 
-Il database si può ispezionare da http://localhost:8080/h2-console
-(JDBC URL `jdbc:h2:file:./data/poemeta`, utente `sa`, password vuota).
+You can look at the database at http://localhost:8080/h2-console
+(JDBC URL `jdbc:h2:file:./data/poemeta`, user `sa`, empty password).
 
 ---
 
-## Idee per le prossime versioni
+## Ideas for later
 
-- Budget: proporre il miglior insieme di cambi entro una cifra scelta dal giocatore.
-- Ordine di progressione (gemme e oggetti per fascia di livello).
-- Avvisi di prezzo (desktop o Discord).
-- Diario delle sessioni di farm con profitto/ora reale.
-- Fonte dati alternativa tramite le API ufficiali di GGG (richiede la registrazione di un'app OAuth).
+- Progression order (gems and items by level range).
+- Price alerts (desktop or Discord).
+- Farming log with real profit per hour.
+- Use GGG's official API as an alternative data source (needs an OAuth app registration).
+
+Feedback and bug reports are welcome, open an issue on GitHub.

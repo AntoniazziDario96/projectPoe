@@ -117,6 +117,28 @@ class CompareServiceTest {
     }
 
     @Test
+    void uniqueWithoutKnownSlotDoesNotBreakTheComparison() {
+        // un unique comune di cui l'analisi non conosce lo slot (uniqueSlots senza la sua voce)
+        Archetype base = analysis().archetypes().get(0);
+        List<Stat> uniques = List.of(base.uniques().get(0), new Stat("Mystery Unique", 0.8, null));
+        Archetype a = new Archetype(base.index(), base.label(), base.size(), base.share(), base.minor(),
+                base.cohesion(), base.representative(), base.avgLevel(), base.avgLife(), base.avgEnergyShield(),
+                base.supports(), base.gems(), uniques, base.keystones(), base.masteries(), base.bloodlines(),
+                base.rareSlots(), base.defence(), base.pantheonMajor(), base.pantheonMinor(), base.uniqueSlots(), null);
+        AnalysisResult analysis = new AnalysisResult("standard", "Occultist", "Winter Orb", 1000, 50, 0,
+                Instant.now(), null, List.of(a));
+        ImportedCharacter ch = new PobParser(PobParserTest.TREE).parse(PobParserTest.XML.strip());
+
+        EconomyService economy = mock(EconomyService.class);
+        when(economy.uniquePrice(anyString(), anyString())).thenReturn(Optional.empty());
+        when(economy.gemPrice(anyString(), anyString())).thenReturn(Optional.empty());
+        CompareResult r = service(economy).compare(ch, analysis, LEAGUE, null, Tier.MID);
+
+        assertThat(r).isNotNull();
+        assertThat(r.items()).anyMatch(s -> "Mystery Unique".equals(s.target()) && s.slot() == null);
+    }
+
+    @Test
     void coverageIgnoresExtras() {
         List<Stat> arch = List.of(new Stat("a", 1.0, null), new Stat("b", 0.5, null), new Stat("rare", 0.1, null));
         assertThat(CompareService.coverage(Set.of("a", "b", "x", "y", "z"), arch)).isEqualTo(1.0);
@@ -158,7 +180,7 @@ class CompareServiceTest {
                 List.of(new Stat("Chaos Inoculation", 0.95, null)), List.of(), List.of(),
                 List.of(helm), new Defence(76, 76, 76, 0, 10, 50),
                 List.of(new Stat("Lunaris", 0.6, null)), List.of(new Stat("Gruthkul", 0.5, null)),
-                Map.of("Badge of the Brotherhood", "Amulet"));
+                Map.of("Badge of the Brotherhood", "Amulet"), null);
         return new AnalysisResult("standard", "Occultist", "Winter Orb", 1000, 50, 0, Instant.now(), null, List.of(a));
     }
 }

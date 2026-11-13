@@ -2,6 +2,7 @@ package it.poemeta.analysis;
 
 import it.poemeta.analysis.AnalysisResult.Archetype;
 import it.poemeta.analysis.AnalysisResult.Defence;
+import it.poemeta.analysis.AnalysisResult.Member;
 import it.poemeta.analysis.AnalysisResult.Range;
 import it.poemeta.analysis.AnalysisResult.ModStat;
 import it.poemeta.analysis.AnalysisResult.RareSlot;
@@ -196,6 +197,7 @@ public class ArchetypeClusterer {
         int rep = c.get(0);
         double bestAvg = -1;
         double sumAll = 0;
+        List<Member> members = new ArrayList<>();
         for (int i : c) {
             double sum = 0;
             for (int j : c) {
@@ -205,6 +207,9 @@ public class ArchetypeClusterer {
             }
             double avg = size > 1 ? sum / (size - 1) : 1;
             sumAll += avg;
+            CharacterProfile m = profiles.get(i);
+            members.add(new Member(m.account(), m.name(), m.level(), m.life(), m.energyShield(), avg,
+                    List.copyOf(uniqueNames(m))));
             if (avg > bestAvg) {
                 bestAvg = avg;
                 rep = i;
@@ -244,7 +249,7 @@ public class ArchetypeClusterer {
                 c.stream().mapToInt(i -> profiles.get(i).energyShield()).average().orElse(0),
                 supports, gems, uniques, keystones, masteries, bloodlines,
                 rareSlots(c, profiles), defence(c, profiles), pantheonMajor, pantheonMinor,
-                uniqueSlots(c, profiles));
+                uniqueSlots(c, profiles), members);
     }
 
     /** Resistenze e suppression medie (solo i personaggi che hanno questi dati). */

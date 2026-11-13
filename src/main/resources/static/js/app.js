@@ -186,6 +186,7 @@ document.addEventListener('submit', (e) => {
                             c.appendChild(s2);
                             delete r.dataset.priceToken;
                         });
+                        delete row.dataset.priceToken;
                         break;
                     }
                 }
@@ -194,8 +195,174 @@ document.addEventListener('submit', (e) => {
             }
             delete row.dataset.priceToken;
             resort();
+            table.dispatchEvent(new CustomEvent('prices-changed'));
         }
+        table.dispatchEvent(new CustomEvent('prices-changed'));
     }
     resort();
     load();
+})();
+
+// Confronta: piano con budget. Sceglie i cambi che avvicinano di più alla build
+// (somma dell'"impatto" di ogni item) senza superare il budget.
+(function () {
+    const box = document.querySelector('[data-budget]');
+    const table = document.querySelector('[data-suggestions]');
+    if (!box || !table) return;
+    const input = box.querySelector('[data-budget-input]');
+    const unit = box.querySelector('[data-budget-unit]');
+    const out = box.querySelector('[data-budget-result]');
+    const divine = Number(box.dataset.divine) || 0;
+    const t = (window.I18N && window.I18N.budget) || {};
+
+    function fill(text, args) {
+        return (text || '').replace(/\{(\d)\}/g, (m, i) => (args[Number(i)] === undefined ? '' : args[Number(i)]));
+    }
+
+    function price(chaos) {
+        if (divine > 0 && chaos >= divine) return (chaos / divine).toFixed(1) + ' div';
+        return (chaos < 10 ? chaos.toFixed(1) : Math.round(chaos)) + ' c';
+    }
+
+    // scelta migliore: con pochi item le proviamo tutte, altrimenti per valore/prezzo
+    function choose(items, budget) {
+        if (items.length <= 16) {
+            let best = { value: 0, cost: 0, mask: 0 };
+            for (let mask = 1; mask < (1 << items.length); mask++) {
+                let cost = 0;
+                let value = 0;
+                for (let i = 0; i < items.length; i++) {
+                    if (mask & (1 << i)) { cost += items[i].price; value += items[i].impact; }
+                }
+                if (cost <= budget && (value > best.value + 1e-9
+                        || (Math.abs(value - best.value) < 1e-9 && cost < best.cost))) {
+                    best = { value, cost, mask };
+                }
+            }
+            return items.filter((it, i) => best.mask & (1 << i));
+        }
+        const sorted = items.slice().sort((a, b) => b.impact / b.price - a.impact / a.price);
+        const picked = [];
+        let left = budget;
+        for (const it of sorted) {
+            if (it.price <= left) { picked.push(it); left -= it.price; }
+        }
+        return picked;
+    }
+
+    const list = box.querySelector('[data-budget-list]');
+    const apply = box.querySelector('[data-budget-apply]');
+
+    function rowLabel(r) {
+        const slot = r.cells[0].querySelector('span');
+        const item = r.cells[2].querySelector('.unique-name, .rare-name');
+        return (slot ? slot.textContent.trim() + ': ' : '') + (item ? item.textContent.trim() : '');
+    }
+
+    function setEnabled(on) {
+        box.classList.toggle('is-disabled', !on);
+        [input, unit, apply].forEach((el) => { if (el) el.disabled = !on; });
+    }
+
+    function update() {
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        rows.forEach((r) => {
+            r.classList.remove('in-plan');
+            const b = r.querySelector('[data-plan-badge]');
+            if (b) b.hidden = true;
+        });
+        list.innerHTML = '';
+        list.hidden = true;
+
+        const items = [];
+        let totalImpact = 0;
+        let unpriced = 0;
+        let waiting = 0;
+        rows.forEach((r) => {
+            const impact = Number(r.dataset.impact) || 0;
+            totalImpact += impact;
+            const p = r.dataset.price;
+            if (p === undefined || p === '') {
+                if (r.dataset.priceToken) waiting++; else unpriced++;
+                return;
+            }
+            const chaos = Number(p);
+            if (chaos > 0 && impact > 0) items.push({ row: r, price: chaos, impact: impact });
+        });
+
+        // nessun item ha un prezzo (es. lega evento): il budget non può scegliere niente
+        if (!items.length && !waiting) {
+            setEnabled(false);
+            out.textContent = t.noPrices || t.nothing || '';
+            return;
+        }
+        setEnabled(true);
+
+        const amount = parseFloat(String(input.value).replace(',', '.'));
+        if (!(amount > 0)) {
+            out.textContent = (t.help || '') + (waiting ? ' ' + (t.waiting || '') : '');
+            return;
+        }
+        const budget = unit.value === 'div' ? amount * divine : amount;
+        const picked = choose(items, budget);
+        picked.forEach((it) => {
+            it.row.classList.add('in-plan');
+            const b = it.row.querySelector('[data-plan-badge]');
+            if (b) b.hidden = false;
+        });
+        let text;
+        if (!picked.length) {
+            text = t.nothing || '';
+        } else {
+            const cost = picked.reduce((a, it) => a + it.price, 0);
+            const value = picked.reduce((a, it) => a + it.impact, 0);
+            const pct = totalImpact > 0 ? Math.round(value / totalImpact * 100) : 0;
+            text = fill(t.result, [picked.length, price(cost), pct]);
+            // elenco dei cambi scelti, dal più utile
+            picked.slice().sort((a, b) => b.impact - a.impact).forEach((it) => {
+                const li = document.createElement('li');
+                const name = document.createElement('span');
+                name.textContent = rowLabel(it.row);
+                const cost1 = document.createElement('span');
+                cost1.className = 'muted';
+                cost1.textContent = price(it.price);
+                li.append(name, cost1);
+                list.appendChild(li);
+            });
+            list.hidden = false;
+        }
+        if (waiting) text += ' ' + (t.waiting || '');
+        else if (unpriced) text += ' ' + fill(t.unpriced, [unpriced]);
+        out.textContent = text;
+    }
+
+    try {
+        const saved = localStorage.getItem('budget');
+        const savedUnit = localStorage.getItem('budgetUnit');
+        if (saved) input.value = saved;
+        if (savedUnit && unit.querySelector('option[value="' + savedUnit + '"]')) unit.value = savedUnit;
+    } catch (e) { /* storage non disponibile */ }
+
+    function changed() {
+        try {
+            localStorage.setItem('budget', input.value);
+            localStorage.setItem('budgetUnit', unit.value);
+        } catch (e) { /* storage non disponibile */ }
+        update();
+    }
+    input.addEventListener('input', changed);
+    unit.addEventListener('change', changed);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); changed(); }
+    });
+    if (apply) {
+        apply.addEventListener('click', () => {
+            changed();
+            // porta in vista il primo item scelto, se c'è
+            const first = table.querySelector('tr.in-plan');
+            if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+    }
+    table.addEventListener('prices-changed', update);
+    update();
 })();

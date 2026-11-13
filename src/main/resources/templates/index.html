@@ -73,6 +73,8 @@
                 </tr>
                 </tbody>
             </table>
+            <p class="muted small" th:if="${noUniquePrices}" th:text="#{common.noUniquePrices(${league.name})}"></p>
+            <p class="muted small" th:if="${!noUniquePrices and uniquesUp.isEmpty()}" th:text="#{home.noRise}"></p>
             <p class="small" style="margin-bottom:0"><a th:href="@{/uniques}" th:text="#{home.allUniques}">Tutti gli unique →</a></p>
         </section>
 
@@ -93,7 +95,7 @@
             </p>
         </section>
 
-        <section class="card">
+        <section class="card wide">
             <h3 th:text="#{home.demand}">Item gialli più richiesti</h3>
             <table th:if="${!demand.isEmpty()}">
                 <tbody>

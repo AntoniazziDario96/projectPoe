@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="${title} + ' · PoE Meta Advisor'">PoE Meta Advisor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">
     <link rel="stylesheet" th:href="@{/css/app.css}">
     <script>
         try { document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark'; } catch (e) { document.documentElement.dataset.theme = 'dark'; }
@@ -17,6 +20,14 @@
                 none: /*[[#{compare.price.none}]]*/ '',
                 down: /*[[#{compare.price.down}]]*/ '',
                 expired: '–'
+            },
+            budget: {
+                help: /*[[#{compare.budget.help}]]*/ '',
+                result: /*[[#{compare.budget.result}]]*/ '',
+                nothing: /*[[#{compare.budget.nothing}]]*/ '',
+                noPrices: /*[[#{compare.budget.noPrices}]]*/ '',
+                unpriced: /*[[#{compare.budget.unpriced}]]*/ '',
+                waiting: /*[[#{compare.budget.waiting}]]*/ ''
             }
         };
     </script>
@@ -31,6 +42,7 @@
         <a th:href="@{/builds}" th:classappend="${active == 'builds'} ? 'active'" th:text="#{nav.builds}">Build</a>
         <a th:href="@{/compare}" th:classappend="${active == 'compare'} ? 'active'" th:text="#{nav.compare}">Confronta</a>
         <a th:href="@{/demand}" th:classappend="${active == 'demand'} ? 'active'" th:text="#{nav.demand}">Item richiesti</a>
+        <a th:href="@{/trends}" th:classappend="${active == 'trends'} ? 'active'" th:text="#{nav.trends}">Tendenze</a>
         <a th:href="@{/currency}" th:classappend="${active == 'currency'} ? 'active'" th:text="#{nav.currency}">Currency</a>
         <a th:href="@{/uniques}" th:classappend="${active == 'uniques'} ? 'active'" th:text="#{nav.uniques}">Unique</a>
     </nav>

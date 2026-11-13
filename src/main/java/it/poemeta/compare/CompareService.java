@@ -50,6 +50,14 @@ public class CompareService {
     /** Slot dell'equipaggiamento confrontati, nell'ordine in cui compaiono. */
     static final List<String> EQUIP_SLOTS =
             List.of("Weapon", "Offhand", "Helm", "BodyArmour", "Gloves", "Boots", "Amulet", "Ring", "Belt");
+    /**
+     * true se lo slot è uno di quelli dell'equipaggiamento. Lo slot può mancare (null) per gli unique
+     * di cui non sappiamo dove si mettono: List.of(...).contains(null) lancerebbe un'eccezione.
+     */
+    static boolean isEquipSlot(String slot) {
+        return slot != null && EQUIP_SLOTS.contains(slot);
+    }
+
     /** Un unique si consiglia se lo usa almeno questa quota dei giocatori dell'archetipo. */
     static final double UNIQUE_MIN = 0.50;
     /** Un giallo si confronta se almeno questa quota dei giocatori ne usa uno in quello slot. */
@@ -58,6 +66,8 @@ public class CompareService {
     static final double MIN_DIFF = 0.20;
     /** Sotto questo valore le resistenze sull'item non vengono richieste. */
     static final double MIN_RES_FILTER = 10;
+    /** Valore in più (nel piano con budget) dei gialli che coprono anche le resistenze mancanti. */
+    static final double RES_BONUS = 0.25;
     private static final String CHAOS_INOCULATION = "Chaos Inoculation";
 
     private final EconomyService economy;
@@ -249,7 +259,7 @@ public class CompareService {
         double want = 0;
         double have = 0;
         for (Stat u : a.uniques()) {
-            if (u.pct() >= 0.5 && !EQUIP_SLOTS.contains(uniqueSlots.get(u.name()))) {
+            if (u.pct() >= 0.5 && !isEquipSlot(uniqueSlots.get(u.name()))) {
                 want += u.pct();
                 if (owned.contains(u.name().toLowerCase(Locale.ROOT))) {
                     have += u.pct();
@@ -473,7 +483,7 @@ public class CompareService {
         for (Stat u : arch.uniques()) {
             String slot = uniqueSlots.get(u.name());
             if (u.pct() < UNIQUE_MIN || suggestedUniques.contains(u.name())
-                    || owned.contains(u.name().toLowerCase(Locale.ROOT)) || EQUIP_SLOTS.contains(slot)) {
+                    || owned.contains(u.name().toLowerCase(Locale.ROOT)) || isEquipSlot(slot)) {
                 continue;
             }
             out.add(uniqueSuggestion(slot, null, u, eco));
@@ -533,7 +543,7 @@ public class CompareService {
         }
         return new ItemSuggestion(slot, "unique", current == null ? "compare.reason.missingUniqueEmpty"
                 : "compare.reason.missingUnique", current, u.name(), icon, u.pct(), u.pct(), price, null, url,
-                List.of(), null, null, List.of());
+                List.of(), null, null, List.of(), u.pct());
     }
 
     private RarePlan rarePlan(String slot, EquippedItem it, RareSlot rs, Tier tier) {
@@ -656,10 +666,13 @@ public class CompareService {
             }
         }
         String icon = pl.current() != null ? pl.current().icon() : null;
+        // un giallo che aiuta anche a cappare le resistenze vale di più
+        double impact = pl.diff() * Math.min(1, rs.pctOfArchetype())
+                + (minEle != null && extraEleRes > 0 ? RES_BONUS : 0);
         return new ItemSuggestion(pl.slot(), "rare", pl.reason(), pl.current(), base, icon, pl.diff(),
                 rs.pctOfArchetype(), price, token, url, pl.checks(),
                 minEle == null ? null : TradeLinksRound.down(minEle),
-                minChaos == null ? null : TradeLinksRound.down(minChaos), missing);
+                minChaos == null ? null : TradeLinksRound.down(minChaos), missing, impact);
     }
 
     private void cleanupPending() {

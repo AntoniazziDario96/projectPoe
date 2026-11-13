@@ -9,10 +9,18 @@
     <div class="filters">
         <span class="muted small" th:text="#{movers.period}">Periodo:</span>
         <a class="btn small" th:classappend="${period != 'day'} ? 'secondary'"
-           th:href="${currencyPage} ? @{/currency(period='day')} : @{/uniques(period='day')}" th:text="#{common.24h}">24 ore</a>
+           th:href="${currencyPage} ? @{/currency(period='day')} : @{/uniques(period='day',cat=${cat})}" th:text="#{common.24h}">24 ore</a>
         <a class="btn small" th:classappend="${period != 'week'} ? 'secondary'"
-           th:href="${currencyPage} ? @{/currency(period='week')} : @{/uniques(period='week')}" th:text="#{common.7d}">7 giorni</a>
+           th:href="${currencyPage} ? @{/currency(period='week')} : @{/uniques(period='week',cat=${cat})}" th:text="#{common.7d}">7 giorni</a>
         <span class="muted small" th:if="${snapshot != null}" th:text="#{movers.updated(${@fmt.ago(snapshot.fetchedAt)})}"></span>
+    </div>
+
+    <div class="filters" th:if="${!currencyPage}">
+        <span class="muted small" th:text="#{movers.category}">Tipo:</span>
+        <a class="btn small" th:classappend="${cat != 'all'} ? 'secondary'"
+           th:href="@{/uniques(period=${period})}" th:text="#{movers.cat.all}">Tutti</a>
+        <a class="btn small" th:each="c : ${categories}" th:classappend="${cat != c} ? 'secondary'"
+           th:href="@{/uniques(period=${period},cat=${c})}" th:text="#{__${'movers.cat.' + c}__}">Armi</a>
     </div>
 
     <div class="notice" th:if="${!league.hasEconomy()}" th:text="#{common.noEconomy}"></div>
@@ -21,7 +29,8 @@
         <span th:text="#{movers.partialError}"></span> <span th:text="${snapshot.error}"></span>
     </div>
 
-    <div class="notice" th:if="${snapshot != null and up.isEmpty() and down.isEmpty()}" th:text="#{movers.noChanges}"></div>
+    <div class="notice" th:if="${noUniquePrices}" th:text="#{common.noUniquePrices(${league.name})}"></div>
+    <div class="notice" th:if="${snapshot != null and !noUniquePrices and up.isEmpty() and down.isEmpty()}" th:text="#{movers.noChanges}"></div>
 
     <p class="small muted" th:if="${snapshot != null}" th:text="#{movers.note}"></p>
 
